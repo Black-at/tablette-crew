@@ -18,15 +18,14 @@ Toutes les modifications apparaissent en direct chez tous les membres (base de d
 Dans le dépôt GitHub : **Settings > Pages > Source : Deploy from a branch > Branch : `main` / `(root)`**.
 Le site est ensuite disponible sur `https://<ton-pseudo>.github.io/tablette-crew/`.
 
-### 3. Comptes (identifiant + mot de passe)
-1. Dans Firebase : **Authentication > Commencer > Mode de connexion > E-mail/Mot de passe > Activer**.
-2. Publier les règles de `firestore.rules` (Firestore Database > Règles).
-3. Migration d'un crew existant (une seule fois) : l'admin ouvre `https://<ton-pseudo>.github.io/tablette-crew/#migration`
-   sur l'appareil où il utilisait déjà le site, entre son nom et choisit son mot de passe. Tous les comptes sont créés ;
-   les OP, bilans, coffre et formations sont conservés.
-4. Onglet **Comptes** (admin) : bouton « Copier » pour envoyer à chacun son lien, son identifiant et son mot de passe de départ,
-   « Réinitialiser » en cas d'oubli ou de fuite.
-5. Chaque membre peut changer son mot de passe dans **Paramètres**.
+### 3. Mots de passe
+Pas besoin d'activer quoi que ce soit dans Firebase : il suffit de publier les règles de `firestore.rules`.
+
+- **Identifiant** = le nom du membre dans le crew. **Mot de passe** = donné par l'admin, modifiable dans **Paramètres**.
+- Crew qui utilisait les anciens codes `XXXX-XXXX-XXXX` : l'admin se connecte avec son ancien code (dans « Mot de passe ») ;
+  le site lui demande une **mise à jour de sécurité** qui crée un mot de passe pour chacun et désactive tous les anciens codes.
+- Crew qui n'avait qu'un code de crew : l'admin ouvre `https://<ton-pseudo>.github.io/tablette-crew/#migration`.
+- Onglet **Codes d'accès** (admin) : « Copier » prépare le message à envoyer en privé, « Réinitialiser » en cas d'oubli ou de fuite.
 
 ## Droits
 | Grade | Peut faire |
@@ -42,9 +41,11 @@ Ces droits sont vérifiés par Firebase (fichier `firestore.rules`), pas seuleme
 Rappel à l'ordre (ne compte pas) ou avertissement. **2 avertissements = viré automatiquement.**
 
 ## Sécurité
-- Les mots de passe sont gérés par Firebase Authentication : ils ne sont jamais enregistrés dans les données du crew.
-- Seuls les membres connectés et actifs peuvent lire les données.
-- Un membre viré ou réinitialisé perd l'accès immédiatement.
+- Le mot de passe ne quitte jamais le navigateur : le site en calcule une clé secrète (PBKDF2).
+- Chaque modification est envoyée avec une preuve à usage unique, illisible par tous : impossible de récupérer
+  la clé d'un autre membre dans les données, ou de réutiliser une preuve.
+- Changer ou réinitialiser un mot de passe désactive aussitôt l'ancien. Un membre viré ne peut plus rien modifier.
+- Limite : quelqu'un qui récupère l'identifiant interne du crew (enregistré dans le navigateur d'un membre) peut lire les données, pas les modifier.
 
 ## Limites gratuites Firebase
 50 000 lectures et 20 000 écritures par jour : largement suffisant pour un crew.
