@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="config.js"></script>
 <style>
 /* Layout: the in-game crew tablet — fixed sidebar of nav tiles + header rule with square end caps + card grid, on a hazard-striped ground. Single dark theme on purpose. */
@@ -326,6 +327,45 @@ tr:last-child td{border-bottom:0}
 .toast{position:fixed;left:50%;bottom:max(20px,env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);opacity:0;z-index:80;padding:10px 16px;border-radius:5px;background:#24252b;border:1px solid var(--line-2);box-shadow:0 10px 30px rgba(0,0,0,.5);font-size:13px;transition:.2s;pointer-events:none;max-width:calc(100% - 32px)}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 
+
+/* Inventaire du coffre (style inventaire en jeu) */
+.inv-wrap{display:flex;flex-direction:column;gap:12px}
+.inv-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.inv-ic{display:grid;place-items:center;width:40px;height:40px;border-radius:5px;background:var(--card-2);border:1px solid var(--line-2)}
+.inv-ic .ic{width:20px;height:20px}
+.inv-head strong{display:block;font-size:18px;font-weight:800;text-transform:uppercase;letter-spacing:.03em}
+.inv-head small{display:block;color:var(--muted);font-size:12px}
+.inv-kg{margin-left:auto;text-align:right;font-size:13px;color:var(--muted);min-width:140px}
+.inv-kg b{font-size:22px;color:var(--fg)}
+.kgbar{display:block;height:4px;border-radius:2px;background:#24252a;margin-top:6px;overflow:hidden}
+.kgbar i{display:block;height:100%;background:var(--accent)}
+.inv-search{display:flex;align-items:center;gap:10px;padding:0 14px;border:1px solid var(--line-2);border-radius:5px;background:#141518}
+.inv-search input{flex:1;min-width:0;border:0;background:transparent;padding:12px 0;font-size:14px;outline:none}
+.inv-search:focus-within{border-color:var(--accent-line)}
+.inv-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:6px}
+.inv-tabs button{padding:10px 8px;border-radius:4px;background:var(--tile);border:1px solid var(--line);color:var(--muted);font-weight:600;font-size:12.5px}
+.inv-tabs button[aria-pressed="true"]{background:linear-gradient(180deg,#2399f0,var(--accent-2));border-color:rgba(91,179,245,.5);color:#fff}
+.inv-cols{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)}
+.inv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:6px;align-content:start}
+.tile{position:relative;aspect-ratio:1/1.02;min-height:104px;background:linear-gradient(180deg,#202126,#17181c);border:1px solid var(--line);border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:20px 6px 11px;text-align:center;overflow:hidden}
+.tile:hover{border-color:var(--line-2);background:linear-gradient(180deg,#25262c,#1a1b20)}
+.tile.sel{border-color:var(--accent-hi);box-shadow:inset 0 0 0 1px var(--accent-hi)}
+.tile .tw{position:absolute;top:6px;left:7px;font-size:10.5px;font-weight:600;color:#cfd2d7}
+.tile .tq{position:absolute;top:6px;right:7px;font-size:10.5px;font-weight:600;color:#eceef1}
+.tile .ti{flex:1;display:grid;place-items:center;width:100%;min-height:0}
+.tile .ti svg{width:46px;height:46px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.5))}
+.tile .tn{font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.tile .tb{position:absolute;left:8px;bottom:5px;height:3px;border-radius:2px;background:var(--accent)}
+.tile.low .tb{background:var(--danger)}
+.tile.low{border-color:rgba(229,72,77,.35)}
+.ti-big svg{width:52px;height:52px}
+.inv-detail .row{flex-wrap:nowrap}
+.inv-detail .row:not(:first-child){flex-wrap:wrap}
+details.edit{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+details.edit summary{cursor:pointer;font-size:12.5px;color:var(--accent-hi)}
+.dots{display:inline-flex;gap:5px}
+.dots i{width:12px;height:12px;border-radius:50%;border:1px solid rgba(229,72,77,.6)}
+.dots i.on{background:var(--danger)}
 @media (max-width:900px){
   .app{grid-template-columns:minmax(0,1fr)}
   .side{min-width:0;position:relative;top:0;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:18px 16px;gap:14px}
@@ -338,7 +378,7 @@ tr:last-child td{border-bottom:0}
   .quit small{display:none}
   .quit{padding:8px 12px}
   .main{padding:18px 14px 22px}
-  .cols{grid-template-columns:1fr}
+  .cols,.inv-cols{grid-template-columns:1fr}
   .who{margin-left:0}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -355,7 +395,7 @@ tr:last-child td{border-bottom:0}
     <nav id="nav" aria-label="Sections"></nav>
     <div class="side-foot">
       <div class="sync" id="sync"><b></b><span>Connexion…</span></div>
-      <button class="quit" data-a="logout" id="quit-btn" hidden><span id="quit-ic"></span><span><strong>Se déconnecter</strong><small>Il faudra ton code pour revenir.</small></span></button>
+      <button class="quit" data-a="logout" id="quit-btn" hidden><span id="quit-ic"></span><span><strong>Se déconnecter</strong><small>Il faudra ton mot de passe pour revenir.</small></span></button>
     </div>
   </aside>
   <main class="main">
@@ -404,6 +444,7 @@ const I = {
   mic:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
   eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   target:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  alert:'<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
   dice:'<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 8h.01M16 16h.01M12 12h.01M16 8h.01M8 16h.01"/>'
 };
 const ic = (n, cls='') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n]||''}</svg>`;
@@ -479,11 +520,12 @@ const DEFAULT_ITEMS = [
 const NAV = [
   {id:'missions', label:'Missions', icon:'swords', title:'Missions', sub:'Lancez des braquages et opérations pour faire progresser votre crew.'},
   {id:'bilans', label:"Bilan d'activité", icon:'scroll', title:"Bilan d'activité", sub:'Historique des OP, gains et participation de chaque membre.'},
-  {id:'coffre', label:'Coffre', icon:'box', title:'Coffre', sub:'Chaque semaine, la roue désigne qui remplit le coffre de la villa.'},
+  {id:'coffre', label:'Coffre', icon:'box', title:'Coffre', sub:'Ce qu\'il y a dans le coffre de la villa, et qui le remplit cette semaine.'},
   {id:'formations', label:'Formations', icon:'grad', title:'Formations', sub:'Négociateur, surveillance des otages, braquage : prends ta formation.'},
   {id:'membres', label:'Membres', icon:'users', title:'Membres', sub:'La hiérarchie du crew et le parcours de chaque membre.'},
+  {id:'sanctions', label:'Sanctions', icon:'alert', title:'Sanctions', sub:"Rappels à l'ordre et avertissements. 2 avertissements = viré."},
   {id:'parametres', label:'Paramètres', icon:'gear', title:'Paramètres', sub:'Nom et niveau du crew, contenu du coffre, profil.'},
-  {id:'codes', label:"Codes d'accès", icon:'lock', title:"Codes d'accès", sub:'Le code personnel de chaque membre. Toi seul les vois.', admin:true},
+  {id:'comptes', label:'Comptes', icon:'lock', title:'Comptes', sub:'Identifiant et mot de passe de chaque membre. Toi seul les vois.', admin:true},
   {id:'paies', label:'Paies', icon:'wallet', soon:true},
   {id:'labos', label:'Laboratoires', icon:'flask', soon:true}
 ];
@@ -514,28 +556,44 @@ const LS = { get(k,d){ try{ const v = localStorage.getItem(k); return v==null ? 
 let toastT;
 function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove('on'), 2600); }
 
-/* ---------- Store (Firebase Firestore, or local fallback) ---------- */
+/* ---------- Store (Firebase Firestore + comptes, ou mode local) ---------- */
 const FB_CFG = window.FIREBASE_CONFIG || null;
-const hasFB = !!(FB_CFG && FB_CFG.apiKey && !/COLLE|XXX/i.test(FB_CFG.apiKey) && window.firebase);
+const hasFB = !!(FB_CFG && FB_CFG.apiKey && !/COLLE|XXX/i.test(FB_CFG.apiKey) && window.firebase && firebase.auth);
 const Store = {
-  mode:'init', db:null, q:{}, local:{}, subs:[], unsubs:[], readOnly:false, synced:false, code:null, key:null,
+  mode:'init', db:null, auth:null, q:{}, local:{}, subs:[], unsubs:[], synced:false, code:null, _sec:null,
   init(){
     if (hasFB) {
-      try { if (!firebase.apps.length) firebase.initializeApp(FB_CFG); this.db = firebase.firestore(); this.mode = 'fire'; }
-      catch(e) { console.error(e); this.mode = 'local'; }
+      try {
+        if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
+        this.db = firebase.firestore(); this.auth = firebase.auth();
+        if (FB_CFG.emulator) { this.db.useEmulator('127.0.0.1', 8085); this.auth.useEmulator('http://127.0.0.1:9099', {disableWarnings:true}); }
+        this.mode = 'fire';
+      } catch(e) { console.error(e); this.mode = 'local'; }
     } else this.mode = 'local';
     if (this.mode === 'local') { this.local = LS.get('crew-local-db', {}); this.synced = true; }
+  },
+  // Deuxième connexion Firebase : sert à créer le compte d'un membre sans déconnecter l'admin.
+  secondary(){
+    if (!this._sec) { this._sec = firebase.initializeApp(FB_CFG, 'comptes'); if (FB_CFG.emulator) this._sec.auth().useEmulator('http://127.0.0.1:9099', {disableWarnings:true}); }
+    return this._sec.auth();
   },
   p(path){ return 'crews/' + this.code + '/' + path; },
   stopAll(){ this.unsubs.forEach(u => { try { u(); } catch(e){} }); this.unsubs = []; this.subs = []; this.synced = this.mode === 'local'; },
   emitLocal(){ LS.set('crew-local-db', this.local); this.subs.forEach(s => s.fire()); },
-  watchColl(name, cb){
+  // opt = {order:'at', dir:'desc', limit:40} pour ne lire que les derniers documents.
+  watchColl(name, cb, opt){
     if (this.mode === 'fire') {
-      const u = this.db.collection(this.p(name)).onSnapshot(s => { if (!s.metadata.fromCache) markSynced(); cb(s.docs.map(d => Object.assign({}, d.data(), {id:d.id})).filter(d => !d._del)); }, e => syncError(e));
+      let q = this.db.collection(this.p(name));
+      if (opt) q = q.orderBy(opt.order, opt.dir || 'asc').limit(opt.limit || 50);
+      const u = q.onSnapshot(s => { if (!s.metadata.fromCache) markSynced(); cb(s.docs.map(d => Object.assign({}, d.data(), {id:d.id})).filter(d => !d._del)); }, e => syncError(e));
       this.unsubs.push(u); return u;
     }
     const depth = name.split('/').length + 1;
-    const sub = {fire:() => cb(Object.entries(this.local).filter(([p,v]) => p.split('/').length===depth && p.startsWith(name+'/') && !v._del).map(([p,v]) => Object.assign({}, v, {id:p.split('/').pop()})))};
+    const sub = {fire:() => {
+      let l = Object.entries(this.local).filter(([p,v]) => p.split('/').length===depth && p.startsWith(name+'/') && !v._del).map(([p,v]) => Object.assign({}, v, {id:p.split('/').pop()}));
+      if (opt) l = l.sort((a,b) => (opt.dir === 'desc' ? -1 : 1) * ((a[opt.order]||0) - (b[opt.order]||0))).slice(0, opt.limit || 50);
+      cb(l);
+    }};
     this.subs.push(sub); sub.fire(); return () => {};
   },
   watchDoc(path, cb){
@@ -546,50 +604,49 @@ const Store = {
     const sub = {fire:() => cb(this.local[path] ? JSON.parse(JSON.stringify(this.local[path])) : null)};
     this.subs.push(sub); sub.fire(); return () => {};
   },
-  async exists(path){ if (this.mode !== 'fire') return !!this.local[path]; const d = await this.db.doc(this.p(path)).get(); return d.exists; },
-  // Documents hors crew (codes personnels) : chemin absolu.
-  async getRoot(path){ if (this.mode !== 'fire') { const v = (LS.get('crew-local-root', {}))[path]; return v || null; } const d = await this.db.doc(path).get(); return d.exists ? d.data() : null; },
-  watchRoot(path, cb){
-    if (this.mode !== 'fire') return () => {};
-    const u = this.db.doc(path).onSnapshot(s => cb(s.exists ? s.data() : null), () => {}); this.unsubs.push(u); return u;
-  },
-  sign(data){ const d = JSON.parse(JSON.stringify(data)); delete d.id; if (this.key) d._k = this.key; return d; },
-  // Écritures groupées : [{path, data, root?}] — root = chemin absolu (hors crew).
+  async getRoot(path){ if (this.mode !== 'fire') return null; const d = await this.db.doc(path).get(); return d.exists ? d.data() : null; },
+  // Retire l'identifiant interne et l'ancien champ _k (ancien système de codes).
+  sign(data){ const d = JSON.parse(JSON.stringify(data)); delete d.id; delete d._k; return d; },
+  // Écritures groupées : [{path, data, root?}] — root = chemin hors crew (users, logins).
   async batch(list){
-    if (this.mode !== 'fire') {
-      const root = LS.get('crew-local-root', {});
-      list.forEach(w => { if (w.root) root[w.path] = this.sign(w.data); else this.local[w.path] = this.sign(w.data); });
-      LS.set('crew-local-root', root); this.emitLocal(); return true;
-    }
+    if (this.mode !== 'fire') { list.forEach(w => { if (!w.root) this.local[w.path] = this.sign(w.data); }); this.emitLocal(); return true; }
     try { const b = this.db.batch(); list.forEach(w => b.set(this.db.doc(w.root ? w.path : this.p(w.path)), this.sign(w.data))); await b.commit(); return true; }
     catch(e) { return writeErr(e); }
   },
   write(path, data){
-    // On ne supprime jamais vraiment : les règles de sécurité l'interdisent. On marque _del.
+    // On ne supprime jamais vraiment (les règles l'interdisent) : on marque _del.
     const clean = this.sign(data === null ? {_del:true} : data);
     if (this.mode !== 'fire') { this.local[path] = clean; this.emitLocal(); return Promise.resolve(true); }
     const prev = this.q[path] || Promise.resolve();
     const run = () => this.db.doc(this.p(path)).set(clean);
     const p = prev.catch(()=>{}).then(run).then(() => true, e => writeErr(e));
     this.q[path] = p; return p;
+  },
+  // Ajoute n à la quantité (dépôt / retrait), sans écraser un dépôt fait en même temps par un autre membre.
+  incr(path, n, extra){
+    if (this.mode !== 'fire') { const d = this.local[path]; if (d) { d.qty = (d.qty||0) + n; Object.assign(d, extra); this.emitLocal(); } return Promise.resolve(true); }
+    const prev = this.q[path] || Promise.resolve();
+    const run = () => this.db.doc(this.p(path)).update(Object.assign({qty: firebase.firestore.FieldValue.increment(n)}, extra));
+    const p = prev.catch(()=>{}).then(run).then(() => true, e => writeErr(e));
+    this.q[path] = p; return p;
   }
 };
 function writeErr(e){
   const c = e && e.code;
-  if (c === 'permission-denied') toast("Action refusée : ton grade ne permet pas de faire ça.");
+  if (c === 'permission-denied') toast("Action refusée : ton grade ne le permet pas (ou le stock est insuffisant).");
   else if (c === 'resource-exhausted') toast("Limite gratuite du jour atteinte. Réessaie demain.");
   else toast("Enregistrement impossible pour l'instant. Vérifie ta connexion.");
   return false;
 }
 function markSynced(){ if (!Store.synced) { Store.synced = true; renderSync(); } }
-function syncError(e){ S.syncErr = true; renderSync(); }
+function syncError(e){ if (e && e.code === 'permission-denied' && S.meId && Store.mode === 'fire') { logout('removed'); return; } S.syncErr = true; renderSync(); }
 
 /* ---------- State ---------- */
 const S = {
   view: 'missions', meId: LS.get('crew-me', null),
   config: null, cfgLoaded:false, ops: [], live: [], coffre: [], forms: [],
   wiz: null, sel: null, confirm: null, period: 'week', spinning: false, pending: false,
-  wheelRot: 0, idOpen: false, syncErr:false, slow:false, mdocs: [], vault: {}, reveal: {}, secured: null, loginOpen: false
+  wheelRot: 0, idOpen: false, syncErr:false, slow:false, mdocs: [], vault: {}, reveal: {}, loginOpen: false, sanctions: [], sxType: 'avert', sxMember: '', sxReason: '', inv: [], invlog: [], invCat: 'all', invQ: '', invSel: null, mvN: 1, coffreTab: 'inv', vaultOn: false
 };
 const cfg = () => Object.assign({crewName:'Crew', crewLevel:1, members:[], coffreItems:DEFAULT_ITEMS, coffreExclude:[], coffreExcludeLast:true}, S.config || {});
 const members = () => S.mdocs.filter(m => !m.removed);
@@ -637,7 +694,7 @@ function renderTop(){
   const n = NAV.find(x => x.id === S.view) || NAV[0];
   const m = me();
   $('#top').innerHTML = `${ic(n.icon,'t-ic')}<div><h2>${n.title}</h2><p>${n.sub}</p></div>
-    <div class="who"><span><strong>${m ? esc(m.name) : 'Non connecté'}</strong><small>${m ? esc(GLABEL[m.grade]||m.grade) + (m.admin ? ' · Admin' : '') : 'Code personnel requis'}</small></span><span class="av">${ic('user')}</span></div>`;
+    <div class="who"><span><strong>${m ? esc(m.name) : 'Non connecté'}</strong><small>${m ? esc(GLABEL[m.grade]||m.grade) + (m.admin ? ' · Admin' : '') : 'Connexion requise'}</small></span><span class="av">${ic('user')}</span></div>`;
   const qb = $('#quit-btn'); if (qb) qb.hidden = !m;
   let notice = '';
   if (Store.mode === 'local') notice = `<div class="banner">${ic('info')}Mode local : la base de données n'est pas encore configurée (fichier config.js). Les données restent sur cet appareil.</div>`;
@@ -648,7 +705,7 @@ function render(){
   renderNav(); renderTop(); renderSync();
   const v = VIEWS[S.view] || VIEWS.missions;
   $('#view').innerHTML = v();
-  if (S.view === 'coffre') drawWheel();
+  if (S.view === 'coffre' && S.coffreTab === 'roue') drawWheel();
 }
 function scheduleRender(){
   if (S.spinning) { S.pending = true; return; }
@@ -1015,7 +1072,7 @@ function spin(){
   };
   requestAnimationFrame(step);
 }
-VIEWS.coffre = () => {
+function roueView(){
   const el = eligible(); if (!S.spinning) wheelNames = el.map(m => m.name);
   const cur = S.coffre.find(c => c.id === thisWeek());
   const items = cur ? (cur.items || []) : [];
@@ -1026,7 +1083,7 @@ VIEWS.coffre = () => {
   const hist = S.coffre.filter(x => x.id !== thisWeek()).sort((a,b) => a.id < b.id ? 1 : -1);
   let spinBtn;
   if (!members().length) spinBtn = `<button class="btn" disabled>Ajoute d'abord les membres</button>`;
-  else if (!lead) spinBtn = `<button class="btn lock-b" disabled>Tirage réservé aux leads</button>`;
+  else if (!lead) spinBtn = `<button class="btn lock-b" disabled>Tirage réservé aux Exécutants</button>`;
   else if (cur && S.confirm !== 'respin') spinBtn = `<button class="btn" data-a="askconfirm" data-k="respin">${ic('dice')}Refaire le tirage</button>`;
   else if (cur) spinBtn = `<button class="btn red" id="spin-btn" data-a="spin">Confirmer : remplacer ${esc(cur.member)}</button><button class="btn" data-a="noconfirm">Annuler</button>`;
   else spinBtn = `<button class="btn pri" id="spin-btn" data-a="spin" ${!el.length?'disabled':''}>${ic('dice')}Lancer la roue</button>`;
@@ -1049,7 +1106,7 @@ VIEWS.coffre = () => {
           <div class="items">${items.map((x,i) => `<button class="item ${x.done?'done':''}" data-a="citem" data-i="${i}" ${canTick?'':'disabled'} aria-pressed="${!!x.done}"><span class="bx">${x.done?ic('check'):''}</span><span class="t">${esc(x.label)}</span><span class="q">×${x.qty}</span></button>`).join('')}</div>
           <div class="progress"><i style="width:${items.length ? done/items.length*100 : 0}%"></i></div>
           <p class="hint" style="margin:8px 0 0">${done}/${items.length} déposés${canTick ? ' · coche au fur et à mesure du dépôt dans le coffre' : ''}.</p>`
-        : `<div class="empty"><strong>Pas encore de tirage cette semaine</strong>${lead ? 'Lance la roue pour désigner qui remplit le coffre.' : 'Un lead doit lancer la roue.'}</div>`}
+        : `<div class="empty"><strong>Pas encore de tirage cette semaine</strong>${lead ? 'Lance la roue pour désigner qui remplit le coffre.' : 'Un Exécutant doit lancer la roue.'}</div>`}
       </div>
       <div class="panel"><h3>Historique</h3>
         ${hist.length ? `<div class="hist">${hist.slice(0,12).map(h => { const it = h.items||[]; const d = it.filter(x => x.done).length; const full = it.length && d === it.length;
@@ -1058,7 +1115,10 @@ VIEWS.coffre = () => {
         : '<p class="hint" style="margin:0">Les semaines passées apparaîtront ici, avec qui a rempli le coffre et qui ne l\'a pas fait.</p>'}
       </div>
     </div></div>`;
-};
+}
+VIEWS.coffre = () => `<div class="row" style="margin-bottom:14px"><div class="seg" role="group" aria-label="Coffre">
+    <button data-a="ctab" data-t="inv" aria-pressed="${S.coffreTab==='inv'}">Inventaire</button><button data-a="ctab" data-t="roue" aria-pressed="${S.coffreTab==='roue'}">Roue de la semaine</button></div></div>
+  ${S.coffreTab === 'roue' ? roueView() : invView()}`;
 
 /* ---------- Formations ---------- */
 function setForm(m, fid, status){
@@ -1114,7 +1174,7 @@ VIEWS.membres = () => {
     return `<tr><td><b>${esc(m.name)}</b>${m.id === S.meId ? ' <span class="st-pill info">toi</span>' : ''}${m.admin ? ' <span class="st-pill wait">admin</span>' : ''}</td>
       <td>${can ? `<select class="inp" data-c="mgrade" data-id="${esc(m.id)}" id="g-${esc(m.id)}" aria-label="Grade de ${esc(m.name)}">${choices.map(g => `<option ${g===m.grade?'selected':''} value="${g}">${GLABEL[g]||g}</option>`).join('')}</select>` : `<span class="grade" style="--gc:${GCOL[m.grade]}">${esc(GLABEL[m.grade]||m.grade)}</span>`}</td>
       <td>${fBadges(m.name) || '<span style="color:var(--dim)">—</span>'}</td>
-      <td class="num">${opsCount(m.name)}</td><td class="num">${coffreCount(m.id)}</td>
+      <td class="num">${opsCount(m.name)}</td><td class="num">${coffreCount(m.id)}</td><td class="num" style="color:${warnCount(m.id) ? 'var(--danger)' : 'var(--dim)'}">${warnCount(m.id)}/2</td>
       <td style="text-align:right;white-space:nowrap">${can ? (S.confirm === k ? `<button class="btn red sm" data-a="mdel" data-id="${esc(m.id)}">Virer du crew</button> <button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}" aria-label="Virer ${esc(m.name)}">${ic('trash')}</button>`) : ''}</td></tr>`;
   }).join('');
   const counts = GRADES.map(g => { const n = ms.filter(m => m.grade === g).length; return n ? `<span class="pc" style="--pc:${GCOL[g]}">${GLABEL[g]||g} <b class="num">${n}</b></span>` : ''; }).join('');
@@ -1124,7 +1184,7 @@ VIEWS.membres = () => {
       <select class="inp" id="madd-grade" aria-label="Grade">${GRADES.map(g => `<option value="${g}" ${g==='Membre'?'selected':''}>${GLABEL[g]||g}</option>`).join('')}</select>
       <button class="btn pri" data-a="madd">${ic('plus')}Ajouter au crew</button></div>` : ''}
     ${ms.length ? `<div class="chips" style="margin-bottom:12px">${counts}</div>
-      <div class="panel"><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Grade</th><th>Formations</th><th>OP</th><th>Coffre</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`
+      <div class="panel"><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Grade</th><th>Formations</th><th>OP</th><th>Coffre</th><th>Avert.</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`
       : `<div class="empty"><strong>Chargement des membres…</strong></div>`}`;
 };
 
@@ -1145,94 +1205,405 @@ VIEWS.parametres = () => {
       ${mg ? `<button class="btn sm" data-a="iadd" style="margin-top:10px">${ic('plus')}Ajouter un objet</button>` : ''}
     </div></div>
     <div class="stack">
-      <div class="panel"><h3>Mon profil</h3><p class="hint">Tu es connecté avec ton code personnel. Ne le donne à personne.</p>
-        <div class="row"><b>${m ? esc(m.name) : '—'}</b>${m ? `<span class="grade" style="--gc:${GCOL[m.grade]}">${esc(GLABEL[m.grade]||m.grade)}</span>` : ''}${m && m.admin ? '<span class="st-pill wait">admin</span>' : ''}<span class="spacer"></span><button class="btn sm" data-a="logout">${ic('logout')}Se déconnecter</button></div></div>
+      <div class="panel"><h3>Mon profil</h3><p class="hint">Ton identifiant : <code>${m ? esc(loginId(m.name)) : '—'}</code></p>
+        <div class="row"><b>${m ? esc(m.name) : '—'}</b>${m ? `<span class="grade" style="--gc:${GCOL[m.grade]}">${esc(GLABEL[m.grade]||m.grade)}</span>` : ''}${m && m.admin ? '<span class="st-pill wait">admin</span>' : ''}<span class="spacer"></span><button class="btn sm" data-a="logout">${ic('logout')}Se déconnecter</button></div>
+        ${Store.mode === 'fire' && m ? `<div class="stack" style="gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)"><span class="field">Changer mon mot de passe</span>
+          <input class="inp" id="pw-cur" type="password" autocomplete="current-password" placeholder="Mot de passe actuel" aria-label="Mot de passe actuel">
+          <input class="inp" id="pw-new" type="password" autocomplete="new-password" placeholder="Nouveau mot de passe (8 caractères minimum)" aria-label="Nouveau mot de passe">
+          <input class="inp" id="pw-new2" type="password" autocomplete="new-password" placeholder="Confirme le nouveau mot de passe" aria-label="Confirmer le nouveau mot de passe">
+          <div class="row"><button class="btn pri sm" id="pw-btn" data-a="chpw">Changer mon mot de passe</button></div></div>` : ''}</div>
       <div class="panel"><h3>Qui peut faire quoi</h3><ul class="prog" style="--pc:var(--accent-hi)">
-        <li>${ic('check')}<span><b>Membre, Lieutenant</b> : consulter, s'inscrire à une formation, cocher le coffre quand c'est son tour.</span></li>
-        <li>${ic('check')}<span><b>Exécutant (élite)</b> : lancer les OP, tirer la roue, valider les formations, passer un membre Lieutenant ou Membre, virer un Lieutenant ou un Membre.</span></li>
-        <li>${ic('check')}<span><b>Patron, Co-Patron</b> : tout, sauf les codes d'accès (ajouter des membres, tous les grades, paramètres, supprimer un bilan).</span></li>
-        <li>${ic('check')}<span><b>Admin du site</b> : tout, y compris créer et changer les codes d'accès.</span></li>
+        <li>${ic('check')}<span><b>Membre, Lieutenant</b> : consulter, s'inscrire à une formation, déposer et retirer dans le coffre, cocher la roue quand c'est son tour.</span></li>
+        <li>${ic('check')}<span><b>Exécutant (élite)</b> : lancer les OP, tirer la roue, valider les formations, sanctionner les Lieutenants et Membres, gérer les objets du coffre, passer un membre Lieutenant ou Membre, virer un Lieutenant ou un Membre.</span></li>
+        <li>${ic('check')}<span><b>Patron, Co-Patron</b> : tout, sauf les comptes (ajouter des membres, tous les grades, paramètres, supprimer un bilan).</span></li>
+        <li>${ic('check')}<span><b>Admin du site</b> : tout, y compris créer les comptes et réinitialiser les mots de passe.</span></li>
       </ul></div>
       <div class="panel"><h3>Bientôt</h3><p class="hint" style="margin:0">Paies et laboratoires arrivent dans une prochaine version.</p></div>
     </div></div>`;
 };
 
-/* ---------- Codes d'accès (admin) ---------- */
+/* ---------- Comptes (admin) ---------- */
 const CODE_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function genCode(){ const a = new Uint32Array(12); crypto.getRandomValues(a); const c = Array.from(a, x => CODE_ALPHA[x % 32]).join(''); return c.slice(0,4) + '-' + c.slice(4,8) + '-' + c.slice(8); }
-const inviteLink = code => location.origin + location.pathname + '#cle=' + code;
-function issueCode(m){
-  if (!isAdmin() || !m) return;
-  const code = genCode(); const old = S.vault[m.id];
-  const list = [
-    {root:true, path:'keys/' + code, data:{crew:Store.code, memberId:m.id}},
-    {path:`vault/${Store.key}/codes/${m.id}`, data:{code, memberId:m.id}}
-  ];
-  if (old && old !== Store.key) list.push({root:true, path:'keys/' + old, data:{crew:Store.code, memberId:m.id, revoked:true}});
-  S.vault[m.id] = code; S.reveal[m.id] = true; render();
-  return Store.batch(list).then(ok => { if (ok) toast(old ? `Nouveau code pour ${m.name}. L'ancien ne marche plus.` : `Code créé pour ${m.name}.`); });
+const rnd = n => { const a = new Uint32Array(n); crypto.getRandomValues(a); return Array.from(a, x => 'abcdefghijkmnpqrstuvwxyz23456789'[x % 32]).join(''); };
+const loginId = name => slug(name);
+const loginLink = m => location.origin + location.pathname + '#id=' + loginId(m.name);
+const CODE_RE = /^[A-Za-z0-9_-]{16,64}$/;
+function authMsg(e){
+  const c = (e && e.code) || '';
+  if (c === 'auth/operation-not-allowed') return "Active d'abord la connexion « E-mail/Mot de passe » dans Firebase (Authentication).";
+  if (['auth/invalid-credential','auth/wrong-password','auth/user-not-found','auth/invalid-login-credentials'].includes(c)) return 'Identifiant ou mot de passe incorrect.';
+  if (c === 'auth/too-many-requests') return "Trop d'essais. Réessaie dans quelques minutes.";
+  if (c === 'auth/weak-password') return 'Mot de passe trop faible : 8 caractères minimum.';
+  if (c === 'auth/network-request-failed') return 'Connexion internet impossible.';
+  if (c === 'auth/requires-recent-login') return 'Déconnecte-toi, reconnecte-toi, puis réessaie.';
+  return 'Erreur : ' + (c || (e && e.message) || 'inconnue');
 }
-VIEWS.codes = () => {
+// Crée un compte Firebase pour un membre (sans déconnecter l'admin).
+async function makeAccount(m, password){
+  const sec = Store.secondary();
+  const email = `${m.id}-${rnd(6)}@tablette-crew.app`;
+  const cred = await sec.createUserWithEmailAndPassword(email, password);
+  const uid = cred.user.uid; await sec.signOut();
+  return {uid, email};
+}
+async function issueAccount(m){
+  if (!isAdmin() || !m) return false;
+  const pw = genCode();
+  try {
+    const {uid, email} = await makeAccount(m, pw);
+    const cur = S.mdocs.find(x => x.id === m.id) || m;
+    const md = Object.assign({}, cur, {uid, pwChanged:false});
+    const ok = await Store.batch([
+      {root:true, path:'users/' + uid, data:{crew:Store.code, memberId:m.id}},
+      {root:true, path:'logins/' + loginId(m.name), data:{crew:Store.code, email, memberId:m.id}},
+      {path:'members/' + m.id, data:md},
+      {path:'vault/' + m.id, data:{password:pw, uid}}
+    ]);
+    if (ok) { S.reveal[m.id] = true; toast(cur.uid ? `Nouveau mot de passe pour ${m.name}. L'ancien ne marche plus.` : `Compte créé pour ${m.name}.`); }
+    return ok;
+  } catch(e) { toast(authMsg(e)); return false; }
+}
+function knownPw(m){ const v = S.vault[m.id]; return v && m.uid && v.uid === m.uid && !m.pwChanged ? v.password : null; }
+VIEWS.comptes = () => {
   if (!isAdmin()) return `<div class="empty"><strong>Réservé à l'admin du site</strong></div>`;
   const ms = GRADES.flatMap(g => members().filter(m => m.grade === g));
   const rows = ms.map(m => {
-    const code = S.vault[m.id]; const mine = m.id === S.meId; const k = 'regen:' + m.id;
-    const shown = code ? (S.reveal[m.id] ? `<code class="num" style="font-size:13.5px;letter-spacing:.04em">${esc(code)}</code>` : `<code style="color:var(--dim)">••••-••••-${esc(code.slice(-4))}</code>`) : '<span style="color:var(--warn)">Pas de code</span>';
+    const pw = knownPw(m); const mine = m.id === S.meId; const k = 'reset:' + m.id;
+    let shown;
+    if (!m.uid) shown = '<span style="color:var(--warn)">Pas de compte</span>';
+    else if (mine) shown = '<span style="color:var(--muted)">Le tien (Paramètres pour le changer)</span>';
+    else if (!pw) shown = '<span style="color:var(--muted)">Changé par le membre</span>';
+    else shown = S.reveal[m.id] ? `<code class="num" style="font-size:13.5px;letter-spacing:.04em">${esc(pw)}</code>` : `<code style="color:var(--dim)">••••-••••-${esc(pw.slice(-4))}</code>`;
     let acts = '';
-    if (code) acts += `<button class="btn sm" data-a="reveal" data-id="${esc(m.id)}">${S.reveal[m.id] ? 'Masquer' : 'Afficher'}</button><button class="btn sm" data-a="copylink" data-id="${esc(m.id)}">${ic('copy')}Lien</button>`;
-    if (!code) acts += `<button class="btn pri sm" data-a="mkcode" data-id="${esc(m.id)}">${ic('plus')}Créer son code</button>`;
-    else if (!mine) acts += S.confirm === k ? `<button class="btn red sm" data-a="mkcode" data-id="${esc(m.id)}">Confirmer</button><button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}">Nouveau code</button>`;
-    return `<tr><td><b>${esc(m.name)}</b>${mine ? ' <span class="st-pill info">toi</span>' : ''}</td><td><span class="grade" style="--gc:${GCOL[m.grade]}">${esc(m.grade)}</span></td><td>${shown}</td><td style="text-align:right;white-space:nowrap"><div class="row" style="justify-content:flex-end;gap:6px">${acts}</div></td></tr>`;
+    if (pw && !mine) acts += `<button class="btn sm" data-a="reveal" data-id="${esc(m.id)}">${S.reveal[m.id] ? 'Masquer' : 'Afficher'}</button>`;
+    if (m.uid && !mine) acts += `<button class="btn sm" data-a="copyacc" data-id="${esc(m.id)}">${ic('copy')}Copier</button>`;
+    if (!m.uid) acts += `<button class="btn pri sm" data-a="mkacc" data-id="${esc(m.id)}">${ic('plus')}Créer le compte</button>`;
+    else if (!mine) acts += S.confirm === k ? `<button class="btn red sm" data-a="mkacc" data-id="${esc(m.id)}">Confirmer</button><button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}">Réinitialiser</button>`;
+    return `<tr><td><b>${esc(m.name)}</b>${mine ? ' <span class="st-pill info">toi</span>' : ''}</td><td><span class="grade" style="--gc:${GCOL[m.grade]}">${esc(m.grade)}</span></td><td><code>${esc(loginId(m.name))}</code></td><td>${shown}</td><td style="text-align:right;white-space:nowrap"><div class="row" style="justify-content:flex-end;gap:6px">${acts}</div></td></tr>`;
   }).join('');
-  const missing = ms.filter(m => !S.vault[m.id]).length;
-  return `<div class="banner">${ic('lock')}<span>Donne à chaque membre <b>son</b> code en message privé (ou son lien, qui le connecte directement). Avec ce code, il agit sous son nom et avec son grade.</span></div>
-    ${missing ? `<div class="toolbar" style="margin-bottom:14px"><span class="lbl">${missing} membre${missing>1?'s':''} sans code</span><span class="spacer"></span><button class="btn pri sm" data-a="mkallcodes">${ic('plus')}Créer les codes manquants</button></div>` : ''}
-    <div class="panel"><div class="tbl-wrap"><table><thead><tr><th>Membre</th><th>Grade</th><th>Code personnel</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="hint" style="margin:12px 0 0">« Nouveau code » désactive l'ancien immédiatement : utile si un code a fuité. Un membre viré ne peut plus rien modifier, même avec son code.</p></div>`;
+  const missing = ms.filter(m => !m.uid).length;
+  return `<div class="banner">${ic('lock')}<span>Envoie à chaque membre <b>son</b> identifiant et son mot de passe en message privé (bouton « Copier »). Il pourra ensuite changer son mot de passe dans Paramètres : tu ne le verras plus.</span></div>
+    ${missing ? `<div class="toolbar" style="margin-bottom:14px"><span class="lbl">${missing} membre${missing>1?'s':''} sans compte</span><span class="spacer"></span><button class="btn pri sm" data-a="mkallacc">${ic('plus')}Créer les comptes manquants</button></div>` : ''}
+    <div class="panel"><div class="tbl-wrap"><table><thead><tr><th>Membre</th><th>Grade</th><th>Identifiant</th><th>Mot de passe de départ</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="hint" style="margin:12px 0 0">« Réinitialiser » crée un nouveau mot de passe et désactive l'ancien immédiatement (mot de passe oublié ou qui a fuité). Un membre viré ne peut plus rien voir ni modifier.</p></div>`;
 };
 
 /* ---------- Connexion ---------- */
-const KEY_RE = /^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$/;
-const CODE_RE = /^[A-Za-z0-9_-]{16,64}$/;
+function openLogin(state){ S.loginOpen = true; S.loginMsg = state || S.loginMsg || ''; S.wiz = null; renderSync(); render(); renderLogin(S.loginMsg); }
 function renderLogin(state){
   const root = $('#modal');
   if (!S.loginOpen) { if (!S.wiz) root.innerHTML = ''; return; }
-  if (S.bootstrap) return renderBootstrap(state);
-  const msg = state === 'bad' ? `<div class="banner" style="margin:0">${ic('lock')}Code inconnu ou désactivé. Vérifie-le ou demande-en un nouveau à l'admin du crew.</div>`
-    : state === 'removed' ? `<div class="banner" style="margin:0">${ic('lock')}Ce membre ne fait plus partie du crew.</div>`
-    : state === 'err' ? `<div class="banner" style="margin:0">${ic('lock')}Connexion impossible. Vérifie ta connexion internet puis réessaie.</div>`
-    : state === 'wait' ? '<p>Vérification…</p>' : '';
+  if (S.migrate) return renderMigration(state);
+  const msgs = {
+    bad: 'Identifiant ou mot de passe incorrect.',
+    unknown: "Identifiant inconnu. C'est ton nom dans le crew (ex. « Le R »). Si le crew vient de passer aux comptes, attends que l'admin t'envoie tes identifiants.",
+    removed: 'Ce compte ne fait plus partie du crew.',
+    reset: 'Ton mot de passe a été réinitialisé par l\'admin. Utilise le nouveau.',
+    noaccount: "Ce compte n'est relié à aucun crew."
+  };
+  const msg = state === 'wait' ? '<p>Connexion…</p>' : msgs[state] ? `<div class="banner" style="margin:0">${ic('lock')}<span>${msgs[state]}</span></div>`
+    : state ? `<div class="banner" style="margin:0">${ic('lock')}<span>${esc(state)}</span></div>` : '';
   root.innerHTML = `<div class="ov" role="dialog" aria-modal="true" aria-label="Connexion"><div class="idm">
     <div class="row">${ic('shield')}<h3>Connexion au crew</h3></div>
-    <p>Entre ton code personnel. C'est l'admin du crew qui te le donne en privé. Il est retenu sur cet appareil.</p>
-    <div class="row"><input class="inp" id="key-in" autocomplete="off" spellcheck="false" autocapitalize="characters" placeholder="XXXX-XXXX-XXXX" style="flex:1;min-width:200px;font-size:16px;letter-spacing:.06em" value="${esc(S.keyTry||'')}"><button class="btn pri" data-a="login">Se connecter</button></div>
+    <p>Connecte-toi avec l'identifiant et le mot de passe que l'admin du crew t'a envoyés.</p>
+    <label class="field" for="login-id">Identifiant (ton nom dans le crew)<input class="inp" id="login-id" autocomplete="username" spellcheck="false" placeholder="Le R" value="${esc(S.loginPrefill||'')}"></label>
+    <label class="field" for="login-pw">Mot de passe<input class="inp" id="login-pw" type="password" autocomplete="current-password" placeholder="••••••••"></label>
+    <div class="row"><button class="btn pri" data-a="login" ${state==='wait'?'disabled':''}>Se connecter</button></div>
     ${msg}
   </div></div>`;
-  const i = $('#key-in'); if (i && state !== 'wait') i.focus();
+  const f = S.loginPrefill ? $('#login-pw') : $('#login-id'); if (f && state !== 'wait') f.focus();
 }
-function renderBootstrap(state){
+async function doLogin(){
+  const name = (($('#login-id')||{}).value || '').trim(); const pw = ($('#login-pw')||{}).value || '';
+  S.loginPrefill = name;
+  if (!name || !pw) { renderLogin('bad'); return; }
+  renderLogin('wait');
+  try {
+    const l = await Store.getRoot('logins/' + loginId(name));
+    if (!l || !l.email) { renderLogin('unknown'); return; }
+    await Store.auth.signInWithEmailAndPassword(l.email, pw); // la suite : onAuthStateChanged
+  } catch(e) { renderLogin(['auth/invalid-credential','auth/wrong-password','auth/user-not-found','auth/invalid-login-credentials'].includes(e && e.code) ? 'bad' : authMsg(e)); }
+}
+async function resolveUser(user){
+  try {
+    const u = await Store.getRoot('users/' + user.uid);
+    if (!u || !CODE_RE.test(u.crew || '')) { await Store.auth.signOut(); openLogin('noaccount'); return; }
+    Store.code = u.crew; S.meId = u.memberId; LS.set('crew-code', u.crew);
+    S.loginOpen = false; S.loginMsg = ''; renderLogin(); connect();
+  } catch(e) { openLogin(authMsg(e)); }
+}
+function logout(state){
+  clearTimeout(wizSaveT); Store.stopAll();
+  S.meId = null; S.mdocs = []; S.vault = {}; S.vaultOn = false; S.loginMsg = state || '';
+  if (Store.auth) Store.auth.signOut().catch(() => {});
+  openLogin(state);
+}
+async function changePassword(){
+  const cur = ($('#pw-cur')||{}).value || '', nw = ($('#pw-new')||{}).value || '', nw2 = ($('#pw-new2')||{}).value || '';
+  if (nw.length < 8) { toast('Le nouveau mot de passe doit faire au moins 8 caractères.'); return; }
+  if (nw !== nw2) { toast('Les deux nouveaux mots de passe ne sont pas identiques.'); return; }
+  const user = Store.auth && Store.auth.currentUser; if (!user) return;
+  const btn = $('#pw-btn'); if (btn) { btn.disabled = true; btn.textContent = 'Changement…'; }
+  try {
+    await user.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(user.email, cur));
+    await user.updatePassword(nw);
+    if (me()) await writeMember(me().id, {pwChanged:true});
+    ['#pw-cur','#pw-new','#pw-new2'].forEach(s => { const i = $(s); if (i) i.value = ''; });
+    toast('Mot de passe changé. Garde-le pour toi.');
+  } catch(e) { toast(['auth/invalid-credential','auth/wrong-password','auth/invalid-login-credentials'].includes(e && e.code) ? 'Mot de passe actuel incorrect.' : authMsg(e)); }
+  const b2 = $('#pw-btn'); if (b2) { b2.disabled = false; b2.textContent = 'Changer mon mot de passe'; }
+}
+
+/* ---------- Migration vers les comptes (une seule fois, par l'admin) ---------- */
+function renderMigration(state){
   const root = $('#modal');
-  const old = (S.config && S.config.members) || [];
-  const def = (old.find(m => m.id === 'le-r') || old.find(m => /^le r$/i.test(m.name)) || old[0] || {}).id;
-  root.innerHTML = `<div class="ov" role="dialog" aria-modal="true" aria-label="Codes personnels"><div class="idm">
-    <div class="row">${ic('lock')}<h3>Passage aux codes personnels</h3></div>
-    <p>Le site passe à un code personnel par membre, avec des droits selon le grade. Cette étape se fait <b>une seule fois</b>, par l'admin du site. Les OP, bilans, coffre et formations sont conservés.</p>
-    ${old.length ? `<label class="field" for="boot-admin">Admin du site (il gère les codes)<select class="inp" id="boot-admin">${old.map(m => `<option value="${esc(m.id)}" ${m.id===def?'selected':''}>${esc(m.name)} · ${esc(m.grade)}</option>`).join('')}</select></label>
-      <div class="row"><button class="btn pri" data-a="bootgo" ${state==='wait'?'disabled':''}>${state==='wait' ? 'Création des codes…' : `${ic('lock')}Créer les ${old.length} codes et sécuriser le crew`}</button></div>`
-      : `<div class="empty">Chargement des membres…</div>`}
-    ${state === 'err' ? `<div class="banner" style="margin:0">${ic('lock')}La sécurisation a échoué. Vérifie que les nouvelles règles Firebase sont bien publiées, puis réessaie.</div>` : ''}
+  const err = state && state !== 'wait' ? `<div class="banner" style="margin:0">${ic('lock')}<span>${esc(state)}</span></div>` : '';
+  root.innerHTML = `<div class="ov" role="dialog" aria-modal="true" aria-label="Passage aux comptes"><div class="idm">
+    <div class="row">${ic('lock')}<h3>Passage aux comptes avec mot de passe</h3></div>
+    <p>Chaque membre aura un identifiant et un mot de passe. À faire <b>une seule fois</b>, par l'admin du site. Les OP, bilans, coffre et formations sont conservés.</p>
+    <label class="field" for="mig-name">Ton nom dans le crew (tu deviens l'admin)<input class="inp" id="mig-name" value="Le R" autocomplete="username"></label>
+    <label class="field" for="mig-pw">Choisis ton mot de passe (8 caractères minimum)<input class="inp" id="mig-pw" type="password" autocomplete="new-password"></label>
+    <label class="field" for="mig-pw2">Confirme ton mot de passe<input class="inp" id="mig-pw2" type="password" autocomplete="new-password"></label>
+    <div class="row"><button class="btn pri" data-a="migrate" ${state==='wait'?'disabled':''}>${state==='wait' ? 'Création des comptes… (ne ferme pas la page)' : `${ic('lock')}Créer les comptes`}</button></div>
+    ${err}
   </div></div>`;
 }
+async function migrate(){
+  const name = (($('#mig-name')||{}).value || '').trim(); const pw = ($('#mig-pw')||{}).value || ''; const pw2 = ($('#mig-pw2')||{}).value || '';
+  if (pw.length < 8) { renderMigration('Ton mot de passe doit faire au moins 8 caractères.'); return; }
+  if (pw !== pw2) { renderMigration('Les deux mots de passe ne sont pas identiques.'); return; }
+  Store.code = LS.get('crew-code', null);
+  if (!CODE_RE.test(Store.code || '')) { renderMigration("Ce navigateur ne connaît pas le crew. Ouvre ce lien sur l'appareil où tu utilisais déjà le site."); return; }
+  S.migrating = true; renderMigration('wait');
+  let adminUser = null;
+  try {
+    const cred = await Store.auth.createUserWithEmailAndPassword(`${slug(name)}-${rnd(6)}@tablette-crew.app`, pw);
+    adminUser = cred.user;
+    if ((await Store.db.doc(Store.p('crew/auth')).get().catch(() => null)) === null) throw {code:'mig/done'};
+    let ms = (await Store.db.collection(Store.p('members')).get()).docs.map(d => Object.assign({}, d.data(), {id:d.id}));
+    if (!ms.length) { const c = await Store.db.doc(Store.p('crew/config')).get(); ms = ((c.exists && c.data().members) || []).map(m => Object.assign({removed:false}, m)); }
+    const admin = ms.find(m => !m.removed && slug(m.name) === slug(name));
+    if (!admin) throw {code:'mig/unknown'};
+    const list = [];
+    for (const m of ms) {
+      if (m.removed) continue;
+      let mu, email, mpw = null;
+      if (m.id === admin.id) { mu = adminUser.uid; email = adminUser.email; }
+      else { mpw = genCode(); const r = await makeAccount(m, mpw); mu = r.uid; email = r.email; }
+      list.push({root:true, path:'users/' + mu, data:{crew:Store.code, memberId:m.id}});
+      list.push({root:true, path:'logins/' + loginId(m.name), data:{crew:Store.code, email, memberId:m.id}});
+      list.push({path:'members/' + m.id, data:Object.assign({}, m, {uid:mu, admin:m.id === admin.id, removed:false, pwChanged:m.id === admin.id})});
+      if (mpw) list.push({path:'vault/' + m.id, data:{password:mpw, uid:mu}});
+    }
+    if (!(await Store.batch(list))) throw {code:'mig/write'};
+    if (!(await Store.batch([{path:'crew/auth', data:{at:Date.now(), admin:admin.id}}]))) throw {code:'mig/write'};
+    S.migrating = false; S.migrate = false; location.hash = 'comptes';
+    toast('Comptes créés. Envoie maintenant ses identifiants à chaque membre.');
+    resolveUser(adminUser);
+  } catch(e) {
+    S.migrating = false;
+    if (adminUser) { try { await adminUser.delete(); } catch(_){} try { await Store.auth.signOut(); } catch(_){} }
+    const msgs = {'mig/unknown':`Aucun membre actif ne s'appelle « ${name} ».`, 'mig/done':'Ce crew est déjà passé aux comptes : connecte-toi normalement.', 'mig/write':"L'enregistrement a échoué. Vérifie que les nouvelles règles Firebase sont publiées, puis réessaie."};
+    renderMigration(msgs[e && e.code] || authMsg(e));
+  }
+}
+
+/* ---------- Sanctions ---------- */
+const warnCount = id => S.sanctions.filter(s => s.memberId === id && s.type === 'avert' && !s.cancelled).length;
+const SX_TYPES = {rappel:{label:"Rappel à l'ordre", cls:'info'}, avert:{label:'Avertissement', cls:'fail'}};
+VIEWS.sanctions = () => {
+  const exec = isExec(); const boss = isBoss();
+  const targets = GRADES.flatMap(g => members().filter(m => m.grade === g && canEditMember(m)));
+  if (!targets.some(m => m.id === S.sxMember)) S.sxMember = targets[0] ? targets[0].id : '';
+  const tgt = S.mdocs.find(m => m.id === S.sxMember);
+  const willKick = tgt && S.sxType === 'avert' && warnCount(tgt.id) >= 1;
+  const form = exec ? `<div class="panel"><h3>Sanctionner</h3><p class="hint">${boss ? 'Tu peux sanctionner tous les membres sauf l\'admin.' : 'En tant qu\'Exécutant, tu peux sanctionner les Lieutenants et les Membres.'}</p>
+      ${targets.length ? `<div class="stack" style="gap:12px">
+        <div class="row" style="align-items:flex-end">
+          <label class="field" for="sx-member" style="flex:1;min-width:160px">Membre<select class="inp" id="sx-member" data-c="sxmember">${targets.map(m => `<option value="${esc(m.id)}" ${m.id===S.sxMember?'selected':''}>${esc(m.name)} · ${esc(m.grade)} · ${warnCount(m.id)}/2 avert.</option>`).join('')}</select></label>
+          <div class="field">Type<div class="seg" role="group" aria-label="Type de sanction"><button data-a="sxtype" data-t="rappel" aria-pressed="${S.sxType==='rappel'}">Rappel à l'ordre</button><button data-a="sxtype" data-t="avert" aria-pressed="${S.sxType==='avert'}">Avertissement</button></div></div>
+        </div>
+        <label class="field" for="sx-reason">Raison<input class="inp" id="sx-reason" data-c="sxreason" maxlength="160" placeholder="Ex. Absent à l'OP de samedi sans prévenir" value="${esc(S.sxReason||'')}"></label>
+        ${willKick ? `<div class="banner" style="margin:0">${ic('lock')}<span><b>${esc(tgt.name)}</b> a déjà 1 avertissement : un 2e le vire du crew.</span></div>` : ''}
+        <div class="row">${willKick && S.confirm === 'sx'
+          ? `<button class="btn red" data-a="sanction">Confirmer : avertir et virer ${esc(tgt.name)}</button><button class="btn" data-a="noconfirm">Annuler</button>`
+          : `<button class="btn ${willKick ? 'red' : 'pri'}" data-a="sanction">${ic('alert')}${willKick ? 'Avertir et virer' : S.sxType === 'avert' ? 'Donner un avertissement' : 'Donner un rappel à l\'ordre'}</button>`}</div>
+      </div>` : '<div class="empty">Personne que tu peux sanctionner.</div>'}</div>` : `<div class="banner">${ic('lock')}<span>Seuls les Exécutants et plus peuvent donner des sanctions.</span></div>`;
+  const ids = [...new Set(S.sanctions.map(s => s.memberId))];
+  const summary = ids.map(id => { const m = S.mdocs.find(x => x.id === id); const name = m ? m.name : (S.sanctions.find(s => s.memberId === id) || {}).member;
+    const w = warnCount(id); const r = S.sanctions.filter(s => s.memberId === id && s.type === 'rappel' && !s.cancelled).length;
+    return {id, name, w, r, gone: m && m.removed}; }).filter(x => x.w || x.r).sort((a,b) => b.w - a.w || b.r - a.r);
+  const list = S.sanctions.slice().sort((a,b) => b.at - a.at);
+  return `<div class="banner">${ic('info')}<span>Règle du crew : <b>2 avertissements = viré</b>. Les rappels à l'ordre ne comptent pas.</span></div>
+    <div class="cols"><div class="stack">${form}
+      <div class="panel"><h3>Historique</h3>${list.length ? `<div class="hist">${list.map(s => { const k = 'sxc:' + s.id;
+        return `<div class="hist-r"><span><span class="st-pill ${s.cancelled ? 'wait' : SX_TYPES[s.type].cls}">${s.cancelled ? 'Annulé' : SX_TYPES[s.type].label}</span> <b>${esc(s.member)}</b><br>${esc(s.reason || '')}<br><small>Par ${esc(s.by)} · ${fmtDT(s.at)}${s.cancelled ? ` · annulé par ${esc(s.cancelledBy || '?')}` : ''}</small></span>
+          <span>${boss && !s.cancelled ? (S.confirm === k ? `<button class="btn red sm" data-a="sxcancel" data-id="${esc(s.id)}">Confirmer</button> <button class="btn sm" data-a="noconfirm">Non</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}">Annuler</button>`) : ''}</span></div>`; }).join('')}</div>`
+        : '<p class="hint" style="margin:0">Aucune sanction pour l\'instant.</p>'}</div>
+    </div>
+    <div class="panel"><h3>Avertissements en cours</h3>${summary.length ? `<div class="lb">${summary.map(x => `<div class="lb-r" style="grid-template-columns:minmax(0,1fr) auto"><span class="nm"><b>${esc(x.name)}</b>${x.gone ? '<small style="color:var(--danger)">Viré</small>' : x.r ? `<small style="color:var(--muted)">${x.r} rappel${x.r>1?'s':''}</small>` : ''}</span><span class="dots" aria-label="${x.w} avertissement(s) sur 2"><i class="${x.w>=1?'on':''}"></i><i class="${x.w>=2?'on':''}"></i></span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Personne n\'a d\'avertissement.</p>'}</div>
+    </div>`;
+};
+async function giveSanction(){
+  if (!isExec()) return;
+  const m = S.mdocs.find(x => x.id === S.sxMember); if (!canEditMember(m)) return;
+  const reasonEl = $('#sx-reason'); const reason = ((reasonEl && reasonEl.value) || S.sxReason || '').trim();
+  if (!reason) { toast('Indique la raison de la sanction.'); if (reasonEl) reasonEl.focus(); return; }
+  const type = S.sxType === 'rappel' ? 'rappel' : 'avert';
+  const willKick = type === 'avert' && warnCount(m.id) >= 1;
+  if (willKick && S.confirm !== 'sx') { S.sxReason = reason; S.confirm = 'sx'; render(); return; }
+  const id = uid('sx'); const d = {memberId:m.id, member:m.name, type, reason, at:Date.now(), by:me().name, byId:me().id};
+  S.sanctions.push(Object.assign({}, d, {id})); S.sxReason = ''; S.confirm = null;
+  const ok = await Store.write('sanctions/' + id, d);
+  if (ok && willKick) { await writeMember(m.id, {removed:true}); toast(`${m.name} a 2 avertissements : viré du crew.`); }
+  else if (ok) toast(type === 'avert' ? `Avertissement donné à ${m.name} (${warnCount(m.id)}/2).` : `Rappel à l'ordre donné à ${m.name}.`);
+  render();
+}
+
+/* ---------- Inventaire du coffre ---------- */
+const INV_CATS = [{id:'all', label:'Tout afficher'}, {id:'armes', label:'Armes'}, {id:'muni', label:'Munitions'}, {id:'nourr', label:'Nourriture'}, {id:'vet', label:'Vêtements'}, {id:'divers', label:'Divers'}];
+const INV_ICONS = {
+  ammo:'<g stroke="#5a3a12" stroke-width="1.2"><path d="M14 18c0-5 3-9 3-9s3 4 3 9v20h-6z" fill="#e0a64a"/><path d="M22 16c0-5 3-9 3-9s3 4 3 9v22h-6z" fill="#f0b958"/><path d="M30 18c0-5 3-9 3-9s3 4 3 9v20h-6z" fill="#e0a64a"/></g><g fill="#b07b2c"><rect x="13" y="36" width="8" height="4" rx="1"/><rect x="21" y="36" width="8" height="4" rx="1"/><rect x="29" y="36" width="8" height="4" rx="1"/></g>',
+  cash:'<g transform="rotate(-12 24 24)"><rect x="7" y="16" width="34" height="18" rx="2" fill="#d9776a" stroke="#7a2f27" stroke-width="1.2"/><rect x="7" y="20" width="34" height="3" fill="#f3e3c8"/><rect x="5" y="22" width="34" height="18" rx="2" fill="#e88b7c" stroke="#7a2f27" stroke-width="1.2"/><circle cx="22" cy="31" r="4" fill="#f6d3c9"/></g>',
+  pistol:'<path d="M8 15h30l2 3v5H26l-2 4h-5l-3 12H9l3-13-4-2z" fill="#5d6168" stroke="#22252a" stroke-width="1.3" stroke-linejoin="round"/><path d="M24 23v4" stroke="#22252a" stroke-width="1.3"/>',
+  rifle:'<path d="M3 20h30l3-3h7v6H29l-3 3H17l-2 9H9l2-9H3z" fill="#4f545b" stroke="#202328" stroke-width="1.2" stroke-linejoin="round"/><path d="M33 20v6" stroke="#202328" stroke-width="1.2"/><rect x="21" y="26" width="4" height="8" rx="1" fill="#3a3e44"/>',
+  knife:'<path d="M8 38 30 12c3-3 7-2 8 0L16 40z" fill="#c7ccd2" stroke="#4b5057" stroke-width="1.2"/><path d="m8 38 5 5 5-5-3-3z" fill="#3b2a1e"/>',
+  food:'<path d="M7 24h34c0 9-7 15-17 15S7 33 7 24z" fill="#f2efe8" stroke="#8b7f6b" stroke-width="1.2"/><path d="M9 24c3-6 9-8 15-8s12 2 15 8z" fill="#e6c27a"/><circle cx="18" cy="20" r="3" fill="#d36b4f"/><circle cx="28" cy="19" r="3" fill="#7fb36a"/><path d="M33 8 26 22M38 9l-8 13" stroke="#6b4a2b" stroke-width="1.5"/>',
+  vest:'<path d="M16 8h5l3 4 3-4h5l6 6v26H10V14z" fill="#7d725c" stroke="#3a3428" stroke-width="1.3" stroke-linejoin="round"/><path d="M14 22h20M14 30h20" stroke="#5c5444" stroke-width="2"/>',
+  clothes:'<path d="M17 8 24 12l7-4 9 6-4 7-4-2v19H16V19l-4 2-4-7z" fill="#9b9283" stroke="#4d473e" stroke-width="1.3" stroke-linejoin="round"/><path d="M24 12v4" stroke="#4d473e" stroke-width="1.2"/>',
+  mask:'<ellipse cx="24" cy="24" rx="14" ry="16" fill="#a86a3c" stroke="#4e2f18" stroke-width="1.3"/><ellipse cx="18" cy="21" rx="3" ry="2.5" fill="#2b1a0e"/><ellipse cx="30" cy="21" rx="3" ry="2.5" fill="#2b1a0e"/><path d="M17 31c4 3 10 3 14 0" stroke="#2b1a0e" stroke-width="2" fill="none"/>',
+  can:'<path d="M12 12h18l6 6v24H12z" fill="#d33a32" stroke="#6e1a15" stroke-width="1.3" stroke-linejoin="round"/><rect x="31" y="6" width="5" height="7" rx="1" fill="#2c2c2c"/><path d="m16 18 14 18M30 18 16 36" stroke="#9e2620" stroke-width="2"/>',
+  tool:'<path d="M14 6l6 14M34 6l-6 14" stroke="#c9ccd1" stroke-width="3.5" stroke-linecap="round"/><circle cx="24" cy="22" r="3" fill="#6b6f75"/><path d="M22 24 12 42M26 24l10 18" stroke="#e0783a" stroke-width="5" stroke-linecap="round"/>',
+  drug:'<rect x="11" y="11" width="26" height="28" rx="2" fill="#eef2f6" stroke="#5a6470" stroke-width="1.2"/><path d="M11 19h26" stroke="#3f7fd6" stroke-width="3"/><circle cx="20" cy="29" r="3" fill="#3f7fd6"/><circle cx="29" cy="29" r="3" fill="#7fb3f0"/>',
+  box:'<path d="M8 16 24 9l16 7v18l-16 7-16-7z" fill="#b08a5a" stroke="#5a4127" stroke-width="1.3" stroke-linejoin="round"/><path d="m8 16 16 7 16-7M24 23v18" stroke="#5a4127" stroke-width="1.3" fill="none"/>'
+};
+const ICON_LABELS = {ammo:'Munitions', cash:'Billets', pistol:'Pistolet', rifle:'Fusil / SMG', knife:'Arme blanche', food:'Nourriture', vest:'Gilet', clothes:'Tenue', mask:'Masque', can:'Jerrycan', tool:'Outil', drug:'Produit', box:'Autre'};
+function autoIcon(name, cat){
+  const n = String(name).toLowerCase();
+  if (/balle|munition|ammo|mm\b|acp|gauge|magnum|rifle|\d+[.,]\d+x\d+|cartouche/.test(n)) return 'ammo';
+  if (/billet|argent|cash|\$/.test(n)) return 'cash';
+  if (/menu|repas|burger|sandwich|eau|boisson|nourriture|pizza/.test(n)) return 'food';
+  if (/smg|fusil|carabine|ak|m4|uzi|shotgun|pompe/.test(n)) return 'rifle';
+  if (/pistol|pistolet|revolver|glock|deagle/.test(n)) return 'pistol';
+  if (/machette|couteau|batte|machete|knife/.test(n)) return 'knife';
+  if (/gilet|kevlar|armure/.test(n)) return 'vest';
+  if (/masque|cagoule/.test(n)) return 'mask';
+  if (/tenue|veste|pantalon|vetement|vêtement|t-shirt/.test(n)) return 'clothes';
+  if (/jerry|essence|bidon/.test(n)) return 'can';
+  if (/cisaille|pince|outil|perceuse|crochet|thermite|kit/.test(n)) return 'tool';
+  if (/ghb|weed|coke|meth|drogue|pilule/.test(n)) return 'drug';
+  return {armes:'pistol', muni:'ammo', nourr:'food', vet:'clothes'}[cat] || 'box';
+}
+const invIcon = it => `<svg viewBox="0 0 48 48" aria-hidden="true">${INV_ICONS[it.icon] || INV_ICONS[autoIcon(it.name, it.cat)]}</svg>`;
+const fmtQty = n => new Intl.NumberFormat('fr-FR').format(n || 0);
+const fmtKg = kg => kg >= 1 ? `${kg.toFixed(2)}kg` : kg > 0 ? `${Math.round(kg*1000)}g` : '';
+const CAT_ORDER = ['muni','armes','nourr','vet','divers'];
+function invSorted(){ return S.inv.slice().sort((a,b) => CAT_ORDER.indexOf(a.cat) - CAT_ORDER.indexOf(b.cat) || a.name.localeCompare(b.name, 'fr')); }
+function invFiltered(){ const q = (S.invQ || '').trim().toLowerCase(); return invSorted().filter(it => (S.invCat === 'all' || it.cat === S.invCat) && (!q || it.name.toLowerCase().includes(q))); }
+function tileHtml(it){
+  const low = it.min && it.qty < it.min;
+  const pct = it.min ? Math.min(100, it.qty / it.min * 100) : 100;
+  return `<button class="tile ${low ? 'low' : ''} ${S.invSel === it.id ? 'sel' : ''}" data-a="invsel" data-id="${esc(it.id)}" title="${esc(it.name)}${low ? ` — sous le minimum (${it.min})` : ''}">
+    <span class="tw">${fmtKg((it.w || 0) * (it.qty || 0))}</span><span class="tq">x${fmtQty(it.qty)}</span>
+    <span class="ti">${invIcon(it)}</span><span class="tn">${esc(it.name)}</span><span class="tb" style="width:calc(${pct}% - 16px)"></span></button>`;
+}
+function gridHtml(){
+  const l = invFiltered();
+  return l.length ? l.map(tileHtml).join('') : `<div class="empty" style="grid-column:1/-1">${S.inv.length ? 'Aucun objet ne correspond.' : 'Le coffre est vide pour l\'instant.'}</div>`;
+}
+function invView(){
+  const exec = isExec(); const cap = Number(cfg().coffreCap) || 2500;
+  const kg = S.inv.reduce((s, it) => s + (it.w || 0) * (it.qty || 0), 0);
+  const it = S.inv.find(x => x.id === S.invSel);
+  const lows = S.inv.filter(x => x.min && x.qty < x.min);
+  const k = 'invdel:' + (it ? it.id : '');
+  const detail = it ? `<div class="panel inv-detail"><div class="row"><span class="ti-big">${invIcon(it)}</span><div style="min-width:0"><h3 style="margin:0">${esc(it.name)}</h3><span class="fs" style="color:var(--muted);font-size:12px">${(INV_CATS.find(c => c.id === it.cat) || {}).label || ''}${it.w ? ` · ${fmtKg(it.w)} l'unité` : ''}${it.min ? ` · minimum ${fmtQty(it.min)}` : ''}</span></div><span class="spacer"></span><b class="num" style="font-size:22px">x${fmtQty(it.qty)}</b></div>
+      <div class="row" style="margin-top:12px"><input class="inp num" id="mv-n" type="number" min="1" value="${S.mvN || 1}" style="width:110px" aria-label="Quantité">
+        ${[1,10,100].map(n => `<button class="btn sm" data-a="mvq" data-n="${n}">${n}</button>`).join('')}</div>
+      <div class="row" style="margin-top:10px"><button class="btn ok" data-a="invmv" data-d="1">${ic('plus')}Déposer</button><button class="btn red" data-a="invmv" data-d="-1">${ic('minus')}Retirer</button></div>
+      ${it.by ? `<p class="hint" style="margin:10px 0 0">Dernier mouvement : ${esc(it.by)} · ${ago(it.at)}</p>` : ''}
+      ${exec ? `<details class="edit"><summary>Modifier l'objet</summary><div class="stack" style="gap:8px;margin-top:10px">
+        <input class="inp" id="ie-name" value="${esc(it.name)}" maxlength="40" aria-label="Nom">
+        <div class="row"><select class="inp" id="ie-cat" aria-label="Catégorie">${INV_CATS.slice(1).map(c => `<option value="${c.id}" ${c.id===it.cat?'selected':''}>${c.label}</option>`).join('')}</select>
+          <select class="inp" id="ie-icon" aria-label="Icône"><option value="">Icône auto</option>${Object.keys(INV_ICONS).map(i => `<option value="${i}" ${i===it.icon?'selected':''}>${ICON_LABELS[i]}</option>`).join('')}</select></div>
+        <div class="row"><label class="field" style="flex:1">Poids unitaire (kg)<input class="inp num" id="ie-w" type="number" min="0" step="0.001" value="${it.w || 0}"></label><label class="field" style="flex:1">Minimum voulu<input class="inp num" id="ie-min" type="number" min="0" value="${it.min || 0}"></label><label class="field" style="flex:1">Quantité exacte<input class="inp num" id="ie-qty" type="number" min="0" value="${it.qty || 0}"></label></div>
+        <div class="row"><button class="btn pri sm" data-a="invsave">Enregistrer</button><span class="spacer"></span>${S.confirm === k ? `<button class="btn red sm" data-a="invdel">Confirmer</button><button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}">${ic('trash')}Retirer l'objet du coffre</button>`}</div>
+      </div></details>` : ''}
+    </div>` : `<div class="panel"><p class="hint" style="margin:0">Touche un objet pour déposer ou retirer.</p></div>`;
+  return `<div class="inv-wrap">
+    <div class="inv-head"><span class="inv-ic">${ic('box')}</span><div><strong>${esc(cfg().crewName || 'Crew')}</strong><small>Coffre de la villa</small></div>
+      <div class="inv-kg"><b class="num">${kg.toFixed(1)}</b> / <span class="num">${fmtQty(cap)} kg</span><span class="kgbar"><i style="width:${Math.min(100, kg/cap*100)}%"></i></span></div></div>
+    <div class="inv-search">${ic('target')}<input id="inv-q" data-c="invq" placeholder="Rechercher un objet" value="${esc(S.invQ||'')}" aria-label="Rechercher un objet"></div>
+    <div class="inv-tabs" role="group" aria-label="Catégories">${INV_CATS.map(c => `<button data-a="invcat" data-c2="${c.id}" aria-pressed="${S.invCat===c.id}">${c.label}</button>`).join('')}</div>
+    ${lows.length ? `<div class="banner" style="margin:0">${ic('alert')}<span>Sous le minimum : ${lows.map(x => `<b>${esc(x.name)}</b> (${fmtQty(x.qty)}/${fmtQty(x.min)})`).join(', ')}</span></div>` : ''}
+    <div class="cols inv-cols">
+      <div class="inv-grid" id="inv-grid">${gridHtml()}</div>
+      <div class="stack">${detail}
+        <div class="panel"><h3>Ajouter au coffre</h3><div class="stack" style="gap:8px;margin-top:8px">
+          <input class="inp" id="ia-name" maxlength="40" placeholder="Nom de l'objet (ex. Menus)" aria-label="Nom de l'objet">
+          <div class="row"><select class="inp" id="ia-cat" aria-label="Catégorie" style="flex:1">${INV_CATS.slice(1).map(c => `<option value="${c.id}" ${c.id===(S.invCat!=='all'?S.invCat:'divers')?'selected':''}>${c.label}</option>`).join('')}</select>
+            <input class="inp num" id="ia-qty" type="number" min="1" value="1" style="width:90px" aria-label="Quantité"></div>
+          <label class="field">Poids unitaire en kg (facultatif)<input class="inp num" id="ia-w" type="number" min="0" step="0.001" placeholder="0.3"></label>
+          <button class="btn pri" data-a="invadd">${ic('plus')}Ajouter</button></div></div>
+        ${!S.inv.length && exec ? `<div class="panel"><h3>Coffre vide</h3><p class="hint">Remplir avec le contenu de ta capture d'écran (munitions, armes, menus, tenues…), puis corriger les quantités.</p><button class="btn" data-a="invseed">Importer le contenu actuel</button></div>` : ''}
+        <div class="panel"><h3>Journal</h3>${S.invlog.length ? `<div class="hist">${S.invlog.map(l => `<div class="hist-r"><span><b style="color:${l.delta > 0 ? '#7ee08b' : '#ff8a8d'}" class="num">${l.delta > 0 ? '+' : ''}${fmtQty(l.delta)}</b> ${esc(l.item)}<br><small>${esc(l.by)} · ${ago(l.at)}</small></span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Chaque dépôt et retrait apparaîtra ici, avec qui l\'a fait.</p>'}</div>
+      </div>
+    </div></div>`;
+}
+async function invMove(it, delta){
+  if (!me() || !it || !delta) return;
+  if (delta < 0 && (it.qty || 0) + delta < 0) { toast(`Il n'y a que ${fmtQty(it.qty)} ${it.name} dans le coffre.`); return; }
+  const by = me().name, byId = me().id, at = Date.now();
+  it.qty = (it.qty || 0) + delta; it.by = by; it.at = at; render();
+  const ok = await Store.incr('inv/' + it.id, delta, {at, by, byId});
+  if (ok) { Store.write('invlog/' + uid('l'), {at, itemId:it.id, item:it.name, delta, by, byId}); toast(`${delta > 0 ? 'Déposé' : 'Retiré'} : ${fmtQty(Math.abs(delta))} ${it.name}.`); }
+}
+function invNewDoc(name, cat, qty, w){ return {name, cat, qty, w: w || 0, min: 0, icon: '', at: Date.now(), by: me() ? me().name : '?', byId: me() ? me().id : ''}; }
+const INV_SEED = [
+  ['7.62x39','muni',1000],['7.62x51','muni',1000],['.45 ACP','muni',1000],['9mm','muni',1000],['12 Gauge','muni',1000],['5.56x45','muni',1019],['.44 Magnum','muni',1004],['.22 Long Rifle','muni',1082],
+  ['Combat Pistol','armes',1],['Assault SMG','armes',1],['Marksman Pistol','armes',3],['Micro SMG','armes',1],['Machete','armes',1],
+  ['[REPAS] Menu','nourr',217,0.3],
+  ['Tenue','vet',14,0.5],['Gilet pare-balles','vet',2,0.03],['Masque','vet',1,0.03],
+  ['Cisaille','divers',2,3],['JerryCan','divers',1,2],['GHB','divers',1,0.5]
+];
 
 /* ---------- Actions ---------- */
 const A = {
   logout(){ logout(); },
-  login(){ const v = (($('#key-in') || {}).value || '').trim().toUpperCase().replace(/\s+/g, ''); S.keyTry = v; tryKey(v); },
-  bootgo(){ bootstrap(); },
+  login(){ doLogin(); },
+  migrate(){ migrate(); },
+  chpw(){ changePassword(); },
   reveal(t){ const id = t.dataset.id; S.reveal[id] = !S.reveal[id]; render(); },
-  copylink(t){ const c = S.vault[t.dataset.id]; if (c) copy(inviteLink(c), null); },
-  mkcode(t){ S.confirm = null; issueCode(S.mdocs.find(m => m.id === t.dataset.id)); },
-  async mkallcodes(){ for (const m of members().filter(m => !S.vault[m.id])) await issueCode(m); },
+  copyacc(t){ const m = S.mdocs.find(x => x.id === t.dataset.id); if (!m) return; const pw = knownPw(m);
+    copy(`Tablette du crew : ${loginLink(m)}\nIdentifiant : ${m.name}\n` + (pw ? `Mot de passe : ${pw}\nTu peux le changer dans Paramètres.` : 'Mot de passe : celui que tu as choisi.'), null); },
+  mkacc(t){ S.confirm = null; issueAccount(S.mdocs.find(m => m.id === t.dataset.id)); },
+  async mkallacc(){ for (const m of members().filter(m => !m.uid)) await issueAccount(m); },
+  sxtype(t){ S.sxType = t.dataset.t; S.confirm = null; const r = $('#sx-reason'); if (r) S.sxReason = r.value; render(); },
+  sanction(){ giveSanction(); },
+  sxcancel(t){ const sx = S.sanctions.find(x => x.id === t.dataset.id); S.confirm = null; if (!sx || !isBoss()) return;
+    const d = Object.assign({}, sx, {cancelled:true, cancelledBy:me().name, cancelledAt:Date.now()}); sx.cancelled = true; sx.cancelledBy = me().name;
+    Store.write('sanctions/' + sx.id, d).then(ok => { if (ok) toast('Sanction annulée.'); }); render(); },
+  ctab(t){ S.coffreTab = t.dataset.t; render(); },
+  invcat(t){ S.invCat = t.dataset.c2; render(); },
+  invsel(t){ S.invSel = S.invSel === t.dataset.id ? null : t.dataset.id; S.confirm = null; render(); },
+  mvq(t){ S.mvN = Number(t.dataset.n); const i = $('#mv-n'); if (i) i.value = S.mvN; },
+  invmv(t){ const it = S.inv.find(x => x.id === S.invSel); const i = $('#mv-n'); const n = Math.max(1, parseInt(i ? i.value : S.mvN, 10) || 1); S.mvN = n; invMove(it, n * Number(t.dataset.d)); },
+  invadd(){ if (!me()) return; const name = (($('#ia-name')||{}).value || '').trim().slice(0,40); if (!name) { toast("Indique le nom de l'objet."); return; }
+    const qty = Math.max(1, parseInt(($('#ia-qty')||{}).value, 10) || 1); const w = Math.max(0, parseFloat(($('#ia-w')||{}).value) || 0); const cat = ($('#ia-cat')||{}).value || 'divers';
+    const ex = S.inv.find(x => x.name.toLowerCase() === name.toLowerCase());
+    if (ex) { S.invSel = ex.id; invMove(ex, qty); return; }
+    let id = slug(name); while (S.inv.some(x => x.id === id)) id += '-2';
+    const d = invNewDoc(name, cat, qty, w); S.inv.push(Object.assign({}, d, {id})); S.invSel = id;
+    Store.write('inv/' + id, d).then(ok => { if (ok) { Store.write('invlog/' + uid('l'), {at:d.at, itemId:id, item:name, delta:qty, by:d.by, byId:d.byId}); toast(`Ajouté : ${fmtQty(qty)} ${name}.`); } }); render(); },
+  invsave(){ const it = S.inv.find(x => x.id === S.invSel); if (!it || !isExec()) return;
+    const d = Object.assign({}, it, {name:(($('#ie-name')||{}).value || it.name).trim().slice(0,40) || it.name, cat:($('#ie-cat')||{}).value || it.cat, icon:($('#ie-icon')||{}).value || '',
+      w:Math.max(0, parseFloat(($('#ie-w')||{}).value) || 0), min:Math.max(0, parseInt(($('#ie-min')||{}).value, 10) || 0), qty:Math.max(0, parseInt(($('#ie-qty')||{}).value, 10) || 0), at:Date.now(), by:me().name, byId:me().id});
+    const delta = d.qty - (it.qty || 0); Object.assign(it, d);
+    Store.write('inv/' + it.id, d).then(ok => { if (ok) { if (delta) Store.write('invlog/' + uid('l'), {at:d.at, itemId:it.id, item:d.name, delta, by:d.by, byId:d.byId}); toast('Objet mis à jour.'); } }); render(); },
+  invdel(){ const it = S.inv.find(x => x.id === S.invSel); S.confirm = null; if (!it || !isExec()) return; S.inv = S.inv.filter(x => x !== it); S.invSel = null; Store.write('inv/' + it.id, null).then(ok => { if (ok) toast(`${it.name} retiré du coffre.`); }); render(); },
+  async invseed(){ if (!isExec() || S.inv.length) return; const list = INV_SEED.map(([name, cat, qty, w]) => ({path:'inv/' + slug(name), data:invNewDoc(name, cat, qty, w)}));
+    if (await Store.batch(list)) toast('Contenu importé. Corrige les quantités si besoin.'); },
   askconfirm(t){ S.confirm = t.dataset.k; S.wiz ? renderWiz() : render(); },
   noconfirm(){ S.confirm = null; S.wiz ? renderWiz() : render(); },
   start(t){ if (!isLead()) return; S.wiz = newWiz(t.dataset.m); S.sel = null; S.confirm = null; Store.write('live/' + S.wiz.id, S.wiz); renderWiz(); },
@@ -1290,12 +1661,11 @@ const A = {
     let id = slug(name); if (/^\d/.test(id)) id = 'm' + id; while (S.mdocs.some(m => m.id === id)) id += '-2';
     const grade = $('#madd-grade').value; nameEl.value = '';
     writeMember(id, {name, grade, admin:false, removed:false});
-    if (isAdmin()) { issueCode({id, name}); } else toast(`${name} ajouté. L'admin doit lui créer son code.`);
+    if (isAdmin()) { issueAccount({id, name}); } else toast(`${name} ajouté. L'admin doit lui créer son compte.`);
     const n = $('#madd-name'); if (n) n.focus(); },
   mdel(t){ const m = S.mdocs.find(x => x.id === t.dataset.id); S.confirm = null; if (!canEditMember(m)) return;
     writeMember(m.id, {removed:true}).then(ok => { if (ok) toast(`${m.name} a été viré du crew.`); });
-    const code = S.vault[m.id];
-    if (isAdmin() && code) Store.batch([{root:true, path:'keys/' + code, data:{crew:Store.code, memberId:m.id, revoked:true}}]); },
+  },
   iadd(){ saveConfig({coffreItems: (cfg().coffreItems || DEFAULT_ITEMS).concat([{label:'Nouvel objet', qty:100}])}); },
   idel(t){ const i = Number(t.dataset.i); saveConfig({coffreItems: (cfg().coffreItems || DEFAULT_ITEMS).filter((_,k) => k !== i)}); }
 };
@@ -1309,10 +1679,17 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.id === 'guest-in') { e.preventDefault(); A.guestadd(); }
   if (e.key === 'Enter' && e.target.id === 'madd-name') { e.preventDefault(); A.madd(); }
   if (e.key === 'Escape') { if (S.sel) { S.sel = null; renderWiz(); } }
-  if (e.key === 'Enter' && e.target.id === 'key-in') { e.preventDefault(); A.login(); }
+  if (e.key === 'Enter' && (e.target.id === 'login-pw' || e.target.id === 'login-id')) { e.preventDefault(); A.login(); }
+  if (e.key === 'Enter' && e.target.id === 'mig-pw2') { e.preventDefault(); A.migrate(); }
+  if (e.key === 'Enter' && e.target.id === 'pw-new2') { e.preventDefault(); A.chpw(); }
+  if (e.key === 'Enter' && e.target.id === 'sx-reason') { e.preventDefault(); A.sanction(); }
+  if (e.key === 'Enter' && e.target.id === 'ia-name') { e.preventDefault(); A.invadd(); }
 });
 document.addEventListener('input', e => {
-  const t = e.target; if (t.dataset.c !== 'total' || !S.wiz) return;
+  const t = e.target;
+  if (t.dataset.c === 'invq') { S.invQ = t.value; const g = $('#inv-grid'); if (g) g.innerHTML = gridHtml(); return; }
+  if (t.dataset.c === 'sxreason') { S.sxReason = t.value; return; }
+  if (t.dataset.c !== 'total' || !S.wiz) return;
   S.wiz.total = t.value; saveWiz();
   const op = opFromWiz(S.wiz); const d = $('#disc'); if (d) d.textContent = discordText(op);
   const sh = $('#share'); const n = S.wiz.participants.length; if (sh) sh.textContent = money(n ? Math.floor(op.total/n) : 0) + ' $';
@@ -1329,6 +1706,7 @@ document.addEventListener('change', e => {
     case 'crewlevel': saveConfig({crewLevel: Math.max(1, Math.min(99, parseInt(t.value,10) || 1))}); break;
     case 'ilabel': { const it = items(); it[Number(t.dataset.i)].label = t.value.trim().slice(0,40) || 'Objet'; saveConfig({coffreItems: it}); break; }
     case 'iqty': { const it = items(); it[Number(t.dataset.i)].qty = Math.max(1, parseInt(t.value,10) || 1); saveConfig({coffreItems: it}); break; }
+    case 'sxmember': S.sxMember = t.value; S.confirm = null; { const r = $('#sx-reason'); if (r) S.sxReason = r.value; } render(); break;
     case 'mgrade': { const m = S.mdocs.find(x => x.id === t.dataset.id); if (canEditMember(m) && gradeChoices().includes(t.value)) writeMember(m.id, {grade: t.value}); else render(); break; }
   }
 });
@@ -1361,90 +1739,45 @@ route();
 let slowT;
 function connect(){
   Store.stopAll();
-  Object.assign(S, {config:null, cfgLoaded:false, ops:[], live:[], coffre:[], forms:[], mdocs:[], vault:{}, syncErr:false, slow:false});
+  Object.assign(S, {config:null, cfgLoaded:false, ops:[], live:[], coffre:[], forms:[], mdocs:[], vault:{}, vaultOn:false, sanctions:[], inv:[], invlog:[], syncErr:false, slow:false});
   clearTimeout(slowT); slowT = setTimeout(() => { if (!Store.synced) { S.slow = true; renderSync(); } }, 10000);
   Store.watchDoc('crew/config', d => { S.config = d; S.cfgLoaded = true; scheduleRender(); });
   Store.watchColl('members', l => { S.mdocs = l;
-    if (S.mdocs.length && S.meId && !me()) { logout('removed'); return; }
+    const m = S.mdocs.find(x => x.id === S.meId);
+    if (Store.mode === 'fire' && S.meId && l.length) {
+      const u = Store.auth.currentUser;
+      if (!m || m.removed) { logout('removed'); return; }
+      if (u && m.uid && m.uid !== u.uid) { logout('reset'); return; }
+    }
+    if (isAdmin() && !S.vaultOn) { S.vaultOn = true; Store.watchColl('vault', v => { const o = {}; v.forEach(d => { o[d.id] = d; }); S.vault = o; scheduleRender(); }); }
     scheduleRender(); });
   Store.watchColl('ops', l => { S.ops = l; scheduleRender(); });
   Store.watchColl('live', l => { S.live = l; scheduleRender(); });
   Store.watchColl('coffre', l => { S.coffre = l; scheduleRender(); });
   Store.watchColl('formations', l => { S.forms = l; scheduleRender(); });
-  Store.watchRoot('keys/' + Store.key, k => { if (k && k.revoked) logout('bad'); });
-  watchVault(); // lisible seulement avec le code admin : vide pour les autres
+  Store.watchColl('sanctions', l => { S.sanctions = l; scheduleRender(); });
+  Store.watchColl('inv', l => { S.inv = l; scheduleRender(); });
+  Store.watchColl('invlog', l => { S.invlog = l; scheduleRender(); }, {order:'at', dir:'desc', limit:40});
   renderSync(); render();
-}
-function watchVault(){ Store.watchColl(`vault/${Store.key}/codes`, l => { const v = {}; l.forEach(d => { v[d.id] = d.code; }); S.vault = v; scheduleRender(); }); }
-function openLogin(state){ S.loginOpen = true; S.wiz = null; renderSync(); render(); renderLogin(state); }
-function logout(state){
-  clearTimeout(wizSaveT); Store.stopAll();
-  try { localStorage.removeItem('crew-key'); } catch(e) {}
-  Store.key = null; Store.code = null; S.meId = null; S.mdocs = []; S.vault = {}; S.keyTry = '';
-  S.bootstrap = false; openLogin(state);
-}
-async function tryKey(k){
-  if (!KEY_RE.test(k)) { renderLogin('bad'); return; }
-  renderLogin('wait');
-  try {
-    const d = await Store.getRoot('keys/' + k);
-    if (!d || d.revoked || !CODE_RE.test(d.crew || '')) { renderLogin('bad'); return; }
-    Store.code = d.crew; Store.key = k; S.meId = d.memberId;
-    const mem = Store.mode === 'fire' ? await Store.db.doc(Store.p('members/' + d.memberId)).get() : null;
-    if (mem && (!mem.exists || mem.data().removed)) { Store.key = null; Store.code = null; S.meId = null; renderLogin('removed'); return; }
-    LS.set('crew-key', k); LS.set('crew-code', d.crew);
-    S.loginOpen = false; S.keyTry = ''; renderLogin(); connect();
-    toast(`Bienvenue ${mem ? mem.data().name : ''}.`);
-  } catch(e) { renderLogin('err'); }
-}
-// Migration d'un crew créé avec l'ancien système (un seul code pour tout le monde).
-async function bootstrap(){
-  const old = (S.config && S.config.members) || []; if (!old.length) return;
-  const sel = $('#boot-admin'); const adminId = sel ? sel.value : old[0].id;
-  renderBootstrap('wait');
-  const codes = {}; old.forEach(m => { codes[m.id] = genCode(); });
-  const ak = codes[adminId];
-  Store.key = ak;
-  const list = [];
-  old.forEach(m => {
-    list.push({root:true, path:'keys/' + codes[m.id], data:{crew:Store.code, memberId:m.id}});
-    list.push({path:'members/' + m.id, data:{name:m.name, grade:m.grade, admin: m.id === adminId, removed:false}});
-    list.push({path:`vault/${ak}/codes/${m.id}`, data:{code:codes[m.id], memberId:m.id}});
-  });
-  const ok = await Store.batch(list);
-  const ok2 = ok && await Store.batch([{path:'crew/meta', data:{secured:true, at:Date.now(), admin:adminId}}]);
-  if (!ok || !ok2) { Store.key = null; renderBootstrap('err'); return; }
-  LS.set('crew-key', ak); S.meId = adminId; S.bootstrap = false; S.loginOpen = false;
-  $('#modal').innerHTML = ''; location.hash = 'codes'; connect();
-  toast('Crew sécurisé. Distribue maintenant les codes à chaque membre.');
 }
 
 Store.init();
-(async () => {
+(() => {
   const hash = location.hash;
-  const cle = (hash.match(/^#cle=([A-Za-z0-9-]+)$/) || [])[1];
   const legacy = (hash.match(/^#code=([A-Za-z0-9_-]{16,64})$/) || [])[1];
-  if (cle || legacy) { try { history.replaceState(null, '', location.pathname + location.search); } catch(e) {} }
+  const idp = (hash.match(/^#id=([A-Za-z0-9-]+)$/) || [])[1];
+  S.migrate = hash === '#migration';
   if (legacy) LS.set('crew-code', legacy); // ancien lien d'invitation : retenu pour la migration
-  if (Store.mode !== 'fire') { S.meId = null; connect(); return; }
-  const saved = LS.get('crew-key', null);
-  const key = cle ? cle.toUpperCase() : saved;
-  if (key) { S.loginOpen = true; S.keyTry = key; renderSync(); renderLogin('wait'); return tryKey(key); }
-  // Ancien système : un code de crew sans code personnel.
-  const crew = legacy || LS.get('crew-code', null);
-  if (hash === '#migration') { try { history.replaceState(null, '', location.pathname + location.search); } catch(e) {} }
-  if (hash === '#migration' && crew && CODE_RE.test(crew)) {
-    Store.code = crew;
-    try {
-      if (!(await Store.exists('crew/meta'))) {
-        S.bootstrap = true; S.loginOpen = true; renderSync();
-        Store.watchDoc('crew/config', d => { S.config = d; if (S.bootstrap) renderBootstrap(); });
-        renderBootstrap(); return;
-      }
-    } catch(e) {}
-    Store.code = null;
-  }
-  openLogin();
+  if (idp) S.loginPrefill = decodeURIComponent(idp).replace(/-/g, ' ');
+  if (legacy || idp || S.migrate || /^#cle=/.test(hash)) { try { history.replaceState(null, '', location.pathname + location.search); } catch(e) {} }
+  if (Store.mode !== 'fire') { connect(); return; }
+  S.loginOpen = true; renderSync(); renderLogin('wait');
+  Store.auth.onAuthStateChanged(user => {
+    if (S.migrating) return;
+    if (user && !S.migrate) resolveUser(user);
+    else if (S.migrate) { S.loginOpen = true; render(); renderMigration(); }
+    else openLogin();
+  });
 })();
 })();
 </script>

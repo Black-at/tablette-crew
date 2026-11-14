@@ -1,108 +1,166 @@
 rules_version = '2';
-// Règles de sécurité de la Tablette du Crew.
-// - Chaque membre a un code personnel (collection "keys"). Toute écriture doit porter ce code dans le champ _k.
-// - Les droits dépendent du grade enregistré dans crews/<crew>/members/<id> :
-//     Admin du site : tout, y compris les codes d'accès.
-//     Patron / Co-Patron : tout sauf les codes d'accès.
-//     Exécutant : OP, roue du coffre, formations, grade et renvoi des Membres/Lieutenants.
-//     Lieutenant / Membre : lecture seule, sauf s'inscrire à une formation et cocher le coffre quand c'est leur tour.
-// - Rien n'est jamais supprimé : on marque _del, removed, revoked ou status "none".
-// - Tant que crews/<crew>/crew/meta n'existe pas (ancien crew), les écritures restent ouvertes pour permettre la migration.
+// Règles de sécurité de la Tablette du Crew (comptes Firebase Authentication).
+// - Chaque membre se connecte avec son compte (identifiant + mot de passe).
+//   users/<uid> relie le compte à son crew et à sa fiche membre ; la fiche membre doit porter le même uid.
+// - Droits selon le grade de crews/<crew>/members/<id> :
+//     Admin du site : tout, y compris les comptes.
+//     Patron / Co-Patron : tout sauf les comptes.
+//     Exécutant : OP, roue, formations, sanctions, grade et renvoi des Membres/Lieutenants.
+//     Lieutenant / Membre : lecture, s'inscrire à une formation, cocher le coffre à son tour,
+//       déposer/retirer dans l'inventaire du coffre, changer son mot de passe.
+// - Rien n'est jamais supprimé définitivement.
+// - Tant que crews/<crew>/crew/auth n'existe pas, la migration vers les comptes reste ouverte.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function okCode(c) { return c is string && c.size() >= 16 && c.size() <= 64; }
-    function secured(c) { return exists(/databases/$(database)/documents/crews/$(c)/crew/meta); }
-    function wk() { return request.resource.data._k; }
-    function keyPath() { return /databases/$(database)/documents/keys/$(wk()); }
-    function keyDoc() { return get(keyPath()).data; }
-    function validKey(c) {
-      return wk() is string && wk().size() >= 8 && exists(keyPath())
-        && keyDoc().crew == c && keyDoc().get('revoked', false) == false;
+    function signedIn() { return request.auth != null; }
+    function uPath() { return /databases/$(database)/documents/users/$(request.auth.uid); }
+    function hasUser() { return signedIn() && exists(uPath()); }
+    function u() { return get(uPath()).data; }
+    function myId() { return u().memberId; }
+    function member(c, id) { return get(/databases/$(database)/documents/crews/$(c)/members/$(id)).data; }
+    function me(c) { return member(c, myId()); }
+    // Niveau du membre connecté dans ce crew : 0 = aucun accès, 1 = Membre/Lieutenant, 2 = Exécutant, 3 = Patron/Co-Patron, 4 = admin.
+    function lvlOf(m) {
+      return m.get('admin', false) == true ? 4
+        : (m.grade in ['Patron', 'Co-Patron'] ? 3 : (m.grade == 'Exécutant' ? 2 : 1));
     }
-    function myId() { return keyDoc().memberId; }
-    function me(c) { return get(/databases/$(database)/documents/crews/$(c)/members/$(myId())).data; }
-    function active(c) { return validKey(c) && me(c).get('removed', false) == false; }
-    function isAdmin(c) { return active(c) && me(c).get('admin', false) == true; }
-    function isBoss(c) { return active(c) && (me(c).grade in ['Patron', 'Co-Patron'] || me(c).get('admin', false) == true); }
-    function isExec(c) { return active(c) && (me(c).grade in ['Patron', 'Co-Patron', 'Exécutant'] || me(c).get('admin', false) == true); }
+    function lvl(c) {
+      let ok = hasUser() && u().crew == c;
+      let m = ok ? me(c) : {};
+      return ok && m.get('uid', '') == request.auth.uid && m.get('removed', false) == false ? lvlOf(m) : 0;
+    }
+    function boot(c) { return okCode(c) && signedIn() && !exists(/databases/$(database)/documents/crews/$(c)/crew/auth); }
     function onlyKeys(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+    // Peut agir sur ce membre (grade, renvoi, sanction) ?
+    function canTarget(L, t) {
+      return L == 4
+        || (L == 3 && t.get('admin', false) == false)
+        || (L == 2 && t.get('admin', false) == false && t.grade in ['Membre', 'Lieutenant']);
+    }
+    function memberUpdate(c, mid) {
+      let L = lvl(c);
+      return boot(c) || L == 4
+        || (L == 3 && resource.data.get('admin', false) == false && onlyKeys(['grade', 'removed', 'name', '_k']))
+        || (L == 2 && canTarget(L, resource.data) && request.resource.data.grade in ['Membre', 'Lieutenant']
+            && onlyKeys(['grade', 'removed', '_k']))
+        || (L >= 1 && mid == myId() && onlyKeys(['pwChanged', '_k']));
+    }
+    function sanctionCreate(c) {
+      let L = lvl(c);
+      let d = request.resource.data;
+      return L >= 2 && d.memberId != myId() && d.byId == myId() && d.type in ['rappel', 'avert']
+        && canTarget(L, member(c, d.memberId));
+    }
+    function formationWrite(c, id) {
+      let L = lvl(c);
+      let d = request.resource.data;
+      return L >= 2 || (L >= 1 && d.memberId == myId() && id == myId() + '__' + d.formation
+        && d.status in ['inscrit', 'none'] && (resource == null || resource.data.status != 'forme'));
+    }
+    function invUpdate(c) {
+      let L = lvl(c);
+      let d = request.resource.data;
+      return L >= 2 || (L >= 1 && onlyKeys(['qty', 'at', 'by', 'byId', '_k']) && d.qty is number && d.qty >= 0 && d.byId == myId());
+    }
 
-    // Codes personnels : on peut lire un code seulement si on le connaît (pas de liste).
-    match /keys/{k} {
+    // Lien compte -> crew : lisible uniquement par son propriétaire.
+    match /users/{uid} {
+      allow get: if signedIn() && request.auth.uid == uid;
+      allow list: if false;
+      allow create, update: if okCode(request.resource.data.crew)
+        && (lvl(request.resource.data.crew) == 4 || boot(request.resource.data.crew));
+      allow delete: if false;
+    }
+
+    // Identifiant -> adresse de connexion (ne contient aucun secret).
+    match /logins/{name} {
       allow get: if true;
       allow list: if false;
-      allow create, update: if k.size() >= 8 && okCode(request.resource.data.crew)
-        && (!secured(request.resource.data.crew) || isAdmin(request.resource.data.crew));
+      allow create, update: if okCode(request.resource.data.crew)
+        && (lvl(request.resource.data.crew) == 4 || boot(request.resource.data.crew));
       allow delete: if false;
     }
 
     match /crews/{c} {
       allow read, write: if false;
 
-      match /crew/meta {
-        allow get: if okCode(c);
-        allow create: if okCode(c) && !secured(c);
+      match /crew/auth {
+        allow get: if lvl(c) >= 1 || boot(c);
+        allow create: if boot(c);
         allow update, delete: if false;
       }
 
       match /crew/config {
-        allow read: if okCode(c);
-        allow create, update: if okCode(c) && (!secured(c) || isBoss(c)
-          || (isExec(c) && onlyKeys(['coffreExclude', 'coffreExcludeLast', '_k'])));
+        allow read: if lvl(c) >= 1 || boot(c);
+        allow create, update: if boot(c) || lvl(c) >= 3
+          || (lvl(c) == 2 && onlyKeys(['coffreExclude', 'coffreExcludeLast', '_k']));
         allow delete: if false;
       }
 
       match /members/{mid} {
-        allow read: if okCode(c);
-        allow create: if okCode(c) && (!secured(c)
-          || (isBoss(c) && request.resource.data.get('admin', false) == false));
-        allow update: if okCode(c) && (!secured(c)
-          || isAdmin(c)
-          || (isBoss(c) && resource.data.get('admin', false) == false && request.resource.data.get('admin', false) == false)
-          || (isExec(c) && resource.data.get('admin', false) == false && request.resource.data.get('admin', false) == false
-              && resource.data.grade in ['Membre', 'Lieutenant'] && request.resource.data.grade in ['Membre', 'Lieutenant']
-              && onlyKeys(['grade', 'removed', '_k'])));
+        allow read: if lvl(c) >= 1 || boot(c);
+        allow create: if boot(c)
+          || (lvl(c) >= 3 && request.resource.data.get('admin', false) == false && request.resource.data.get('uid', '') == '');
+        allow update: if memberUpdate(c, mid);
+        allow delete: if false;
+      }
+
+      // Mots de passe de départ, visibles par l'admin seulement.
+      match /vault/{mid} {
+        allow read: if lvl(c) == 4;
+        allow create, update: if lvl(c) == 4 || boot(c);
         allow delete: if false;
       }
 
       match /ops/{id} {
-        allow read: if okCode(c);
-        allow create: if okCode(c) && (!secured(c) || isExec(c));
-        allow update: if okCode(c) && (!secured(c) || isBoss(c)
-          || (isExec(c) && request.resource.data.get('_del', false) == false));
-        allow delete: if okCode(c) && !secured(c);
+        allow read: if lvl(c) >= 1;
+        allow create: if lvl(c) >= 2;
+        allow update: if lvl(c) >= 3 || (lvl(c) == 2 && request.resource.data.get('_del', false) == false);
+        allow delete: if false;
       }
 
       match /live/{id} {
-        allow read: if okCode(c);
-        allow create, update: if okCode(c) && (!secured(c) || isExec(c));
-        allow delete: if okCode(c) && !secured(c);
+        allow read: if lvl(c) >= 1;
+        allow create, update: if lvl(c) >= 2;
+        allow delete: if false;
       }
 
       match /coffre/{w} {
-        allow read: if okCode(c);
-        allow create: if okCode(c) && (!secured(c) || isExec(c));
-        allow update: if okCode(c) && (!secured(c) || isExec(c)
-          || (active(c) && resource.data.memberId == myId() && onlyKeys(['items', '_k'])));
-        allow delete: if okCode(c) && !secured(c);
+        allow read: if lvl(c) >= 1;
+        allow create: if lvl(c) >= 2;
+        allow update: if lvl(c) >= 2
+          || (lvl(c) >= 1 && resource.data.memberId == myId() && onlyKeys(['items', '_k']));
+        allow delete: if false;
       }
 
       match /formations/{id} {
-        allow read: if okCode(c);
-        allow create, update: if okCode(c) && (!secured(c) || isExec(c)
-          || (active(c) && request.resource.data.memberId == myId()
-              && id == myId() + '__' + request.resource.data.formation
-              && request.resource.data.status in ['inscrit', 'none']
-              && (resource == null || resource.data.status != 'forme')));
-        allow delete: if okCode(c) && !secured(c);
+        allow read: if lvl(c) >= 1;
+        allow create, update: if formationWrite(c, id);
+        allow delete: if false;
       }
 
-      // Liste des codes, rangée sous le code de l'admin : seul celui qui connaît ce code peut la lire.
-      match /vault/{ak}/codes/{mid} {
-        allow read: if okCode(c);
-        allow create, update: if okCode(c) && wk() == ak && (!secured(c) || isAdmin(c));
+      match /sanctions/{id} {
+        allow read: if lvl(c) >= 1;
+        allow create: if sanctionCreate(c);
+        allow update: if lvl(c) >= 3 && onlyKeys(['cancelled', 'cancelledBy', 'cancelledAt', '_k']);
         allow delete: if false;
+      }
+
+      // Inventaire du coffre : tout membre dépose / retire, les Exécutants gèrent les objets.
+      match /inv/{id} {
+        allow read: if lvl(c) >= 1;
+        allow create: if lvl(c) >= 1 && request.resource.data.qty is number && request.resource.data.qty >= 0
+          && request.resource.data.get('_del', false) == false;
+        allow update: if invUpdate(c);
+        allow delete: if false;
+      }
+
+      match /invlog/{id} {
+        allow read: if lvl(c) >= 1;
+        allow create: if lvl(c) >= 1 && request.resource.data.byId == myId();
+        allow update, delete: if false;
       }
     }
   }
