@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Les données d'un crew vivent sous crews/<code du crew>/...
+    // Sans le code exact, impossible de lire ou d'écrire, et impossible de lister les crews.
+    match /crews/{code}/{coll}/{docId} {
+      allow read, write: if code.size() >= 16 && code.size() <= 64;
+    }
+  }
+}
