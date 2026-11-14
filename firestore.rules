@@ -1,10 +1,109 @@
 rules_version = '2';
+// Règles de sécurité de la Tablette du Crew.
+// - Chaque membre a un code personnel (collection "keys"). Toute écriture doit porter ce code dans le champ _k.
+// - Les droits dépendent du grade enregistré dans crews/<crew>/members/<id> :
+//     Admin du site : tout, y compris les codes d'accès.
+//     Patron / Co-Patron : tout sauf les codes d'accès.
+//     Exécutant : OP, roue du coffre, formations, grade et renvoi des Membres/Lieutenants.
+//     Lieutenant / Membre : lecture seule, sauf s'inscrire à une formation et cocher le coffre quand c'est leur tour.
+// - Rien n'est jamais supprimé : on marque _del, removed, revoked ou status "none".
+// - Tant que crews/<crew>/crew/meta n'existe pas (ancien crew), les écritures restent ouvertes pour permettre la migration.
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Les données d'un crew vivent sous crews/<code du crew>/...
-    // Sans le code exact, impossible de lire ou d'écrire, et impossible de lister les crews.
-    match /crews/{code}/{coll}/{docId} {
-      allow read, write: if code.size() >= 16 && code.size() <= 64;
+
+    function okCode(c) { return c is string && c.size() >= 16 && c.size() <= 64; }
+    function secured(c) { return exists(/databases/$(database)/documents/crews/$(c)/crew/meta); }
+    function wk() { return request.resource.data._k; }
+    function keyPath() { return /databases/$(database)/documents/keys/$(wk()); }
+    function keyDoc() { return get(keyPath()).data; }
+    function validKey(c) {
+      return wk() is string && wk().size() >= 8 && exists(keyPath())
+        && keyDoc().crew == c && keyDoc().get('revoked', false) == false;
+    }
+    function myId() { return keyDoc().memberId; }
+    function me(c) { return get(/databases/$(database)/documents/crews/$(c)/members/$(myId())).data; }
+    function active(c) { return validKey(c) && me(c).get('removed', false) == false; }
+    function isAdmin(c) { return active(c) && me(c).get('admin', false) == true; }
+    function isBoss(c) { return active(c) && (me(c).grade in ['Patron', 'Co-Patron'] || me(c).get('admin', false) == true); }
+    function isExec(c) { return active(c) && (me(c).grade in ['Patron', 'Co-Patron', 'Exécutant'] || me(c).get('admin', false) == true); }
+    function onlyKeys(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+
+    // Codes personnels : on peut lire un code seulement si on le connaît (pas de liste).
+    match /keys/{k} {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if k.size() >= 8 && okCode(request.resource.data.crew)
+        && (!secured(request.resource.data.crew) || isAdmin(request.resource.data.crew));
+      allow delete: if false;
+    }
+
+    match /crews/{c} {
+      allow read, write: if false;
+
+      match /crew/meta {
+        allow get: if okCode(c);
+        allow create: if okCode(c) && !secured(c);
+        allow update, delete: if false;
+      }
+
+      match /crew/config {
+        allow read: if okCode(c);
+        allow create, update: if okCode(c) && (!secured(c) || isBoss(c)
+          || (isExec(c) && onlyKeys(['coffreExclude', 'coffreExcludeLast', '_k'])));
+        allow delete: if false;
+      }
+
+      match /members/{mid} {
+        allow read: if okCode(c);
+        allow create: if okCode(c) && (!secured(c)
+          || (isBoss(c) && request.resource.data.get('admin', false) == false));
+        allow update: if okCode(c) && (!secured(c)
+          || isAdmin(c)
+          || (isBoss(c) && resource.data.get('admin', false) == false && request.resource.data.get('admin', false) == false)
+          || (isExec(c) && resource.data.get('admin', false) == false && request.resource.data.get('admin', false) == false
+              && resource.data.grade in ['Membre', 'Lieutenant'] && request.resource.data.grade in ['Membre', 'Lieutenant']
+              && onlyKeys(['grade', 'removed', '_k'])));
+        allow delete: if false;
+      }
+
+      match /ops/{id} {
+        allow read: if okCode(c);
+        allow create: if okCode(c) && (!secured(c) || isExec(c));
+        allow update: if okCode(c) && (!secured(c) || isBoss(c)
+          || (isExec(c) && request.resource.data.get('_del', false) == false));
+        allow delete: if okCode(c) && !secured(c);
+      }
+
+      match /live/{id} {
+        allow read: if okCode(c);
+        allow create, update: if okCode(c) && (!secured(c) || isExec(c));
+        allow delete: if okCode(c) && !secured(c);
+      }
+
+      match /coffre/{w} {
+        allow read: if okCode(c);
+        allow create: if okCode(c) && (!secured(c) || isExec(c));
+        allow update: if okCode(c) && (!secured(c) || isExec(c)
+          || (active(c) && resource.data.memberId == myId() && onlyKeys(['items', '_k'])));
+        allow delete: if okCode(c) && !secured(c);
+      }
+
+      match /formations/{id} {
+        allow read: if okCode(c);
+        allow create, update: if okCode(c) && (!secured(c) || isExec(c)
+          || (active(c) && request.resource.data.memberId == myId()
+              && id == myId() + '__' + request.resource.data.formation
+              && request.resource.data.status in ['inscrit', 'none']
+              && (resource == null || resource.data.status != 'forme')));
+        allow delete: if okCode(c) && !secured(c);
+      }
+
+      // Liste des codes, rangée sous le code de l'admin : seul celui qui connaît ce code peut la lire.
+      match /vault/{ak}/codes/{mid} {
+        allow read: if okCode(c);
+        allow create, update: if okCode(c) && wk() == ak && (!secured(c) || isAdmin(c));
+        allow delete: if false;
+      }
     }
   }
 }

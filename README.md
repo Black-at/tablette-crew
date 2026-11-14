@@ -18,17 +18,29 @@ Toutes les modifications apparaissent en direct chez tous les membres (base de d
 Dans le dépôt GitHub : **Settings > Pages > Source : Deploy from a branch > Branch : `main` / `(root)`**.
 Le site est ensuite disponible sur `https://<ton-pseudo>.github.io/tablette-crew/`.
 
-### 3. Créer le crew
-1. Ouvre le site, entre un **code du crew** d'au moins 16 caractères (lettres, chiffres, `-` ou `_`).
-2. Clique sur **Créer le crew avec ce code** : les 13 membres sont ajoutés automatiquement.
-3. Partage le lien du site et le code **uniquement** sur le Discord du crew.
+### 3. Codes personnels
+Chaque membre se connecte avec **son propre code** (format `XXXX-XXXX-XXXX`), créé par l'admin du site.
 
-Chaque membre ouvre le lien, entre le code, puis choisit son nom.
+- **Migration d'un crew existant** (une seule fois) : publier d'abord les règles de `firestore.rules`,
+  puis l'admin ouvre `https://<ton-pseudo>.github.io/tablette-crew/#migration` sur l'appareil où il utilisait le site.
+  Il choisit l'admin, et tous les codes sont créés. Les OP, bilans, coffre et formations sont conservés.
+- L'admin retrouve les codes dans l'onglet **Codes d'accès** : bouton « Lien » pour envoyer un lien qui connecte directement,
+  « Nouveau code » pour désactiver un code qui a fuité.
+
+## Droits
+| Grade | Peut faire |
+|---|---|
+| Membre, Lieutenant | Consulter, s'inscrire à une formation, cocher le coffre quand c'est son tour |
+| Exécutant (élite) | Lancer les OP, tirer la roue, valider les formations, passer un membre Lieutenant ou Membre, virer un Lieutenant ou un Membre |
+| Patron, Co-Patron | Tout sauf les codes d'accès : ajouter des membres, tous les grades, paramètres, supprimer un bilan |
+| Admin du site | Tout, y compris les codes d'accès |
+
+Ces droits sont vérifiés par Firebase (fichier `firestore.rules`), pas seulement par le site.
 
 ## Sécurité
-- Le code du crew sert de mot de passe : toute personne qui l'a peut lire et modifier les données.
-  Si le code fuite, crée un nouveau crew avec un nouveau code (les données ne suivent pas).
-- Le choix du nom dans le site n'est pas protégé : c'est de la confiance entre membres.
+- Avec son code, un membre agit sous son nom et avec son grade : il ne doit le donner à personne.
+- Un membre viré ou dont le code est changé ne peut plus rien modifier.
+- Quelqu'un qui récupère l'identifiant interne du crew (stocké dans le navigateur d'un membre) peut lire les données, mais pas les modifier.
 
 ## Limites gratuites Firebase
 50 000 lectures et 20 000 écritures par jour : largement suffisant pour un crew.
