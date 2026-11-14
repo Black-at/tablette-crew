@@ -609,7 +609,7 @@ const Store = {
     if (this.mode === 'fire') {
       let q = this.db.collection(this.p(name));
       if (opt) q = q.orderBy(opt.order, opt.dir || 'asc').limit(opt.limit || 50);
-      const u = q.onSnapshot(s => { if (!s.metadata.fromCache) markSynced(); cb(s.docs.map(d => Object.assign({}, d.data(), {id:d.id})).filter(d => !d._del)); }, e => syncError(e));
+      const u = q.onSnapshot(s => { if (!s.metadata.fromCache) markSynced(); cb(s.docs.map(d => Object.assign({}, d.data(), {id:d.id})).filter(d => !d._del)); }, e => syncError(e, name));
       this.unsubs.push(u); return u;
     }
     const depth = name.split('/').length + 1;
@@ -622,7 +622,7 @@ const Store = {
   },
   watchDoc(path, cb){
     if (this.mode === 'fire') {
-      const u = this.db.doc(this.p(path)).onSnapshot(s => { if (!s.metadata.fromCache) markSynced(); cb(s.exists ? s.data() : null); }, e => syncError(e));
+      const u = this.db.doc(this.p(path)).onSnapshot(s => { if (!s.metadata.fromCache) markSynced(); cb(s.exists ? s.data() : null); }, e => syncError(e, path));
       this.unsubs.push(u); return u;
     }
     const sub = {fire:() => cb(this.local[path] ? JSON.parse(JSON.stringify(this.local[path])) : null)};
@@ -663,14 +663,14 @@ function writeErr(e){
   return false;
 }
 function markSynced(){ if (!Store.synced) { Store.synced = true; renderSync(); } }
-function syncError(e){ S.syncErr = true; renderSync(); }
+function syncError(e, what){ S.syncErr = {code: (e && e.code) || '', what: what || ''}; renderSync(); renderTop(); }
 
 /* ---------- State ---------- */
 const S = {
   view: 'missions', meId: LS.get('crew-me', null),
   config: null, cfgLoaded:false, ops: [], live: [], coffre: [], forms: [],
   wiz: null, sel: null, confirm: null, period: 'week', spinning: false, pending: false,
-  wheelRot: 0, idOpen: false, syncErr:false, slow:false, mdocs: [], vault: {}, reveal: {}, loginOpen: false, secOpen: false, myKey: null, labs: [], labTab: 'synthese', labN: 1, labName: '', sanctions: [], sxType: 'avert', sxMember: '', sxReason: '', inv: [], invlog: [], invCat: 'all', invQ: '', invSel: null, mvN: 1, coffreTab: 'inv', vaultOn: false
+  wheelRot: 0, idOpen: false, syncErr:false, slow:false, mdocs: [], vault: {}, reveal: {}, loginOpen: false, secOpen: false, myKey: null, labs: [], labTab: 'synthese', labN: 1, labSite: null, labSub: 'prod', labEdit: null, invPlace: 'villa', invSeed: null, sanctions: [], sxType: 'avert', sxMember: '', sxReason: '', inv: [], invlog: [], invCat: 'all', invQ: '', invSel: null, mvN: 1, coffreTab: 'inv', vaultOn: false
 };
 const cfg = () => Object.assign({crewName:'Crew', crewLevel:1, members:[], coffreItems:DEFAULT_ITEMS, coffreExclude:[], coffreExcludeLast:true}, S.config || {});
 const members = () => S.mdocs.filter(m => !m.removed);
@@ -722,7 +722,8 @@ function renderTop(){
   const qb = $('#quit-btn'); if (qb) qb.hidden = !m;
   let notice = '';
   if (Store.mode === 'local') notice = `<div class="banner">${ic('info')}Mode local : la base de données n'est pas encore configurée (fichier config.js). Les données restent sur cet appareil.</div>`;
-  else if (S.syncErr) notice = `<div class="banner">${ic('lock')}Impossible de lire les données du crew. Vérifie le code du crew dans Paramètres, ou ta connexion.</div>`;
+  else if (S.syncErr && S.syncErr.code === 'permission-denied') notice = `<div class="banner">${ic('lock')}<span>Les règles de sécurité Firebase ne sont pas à jour (partie « ${esc(String(S.syncErr.what).split('/')[0])} » refusée). Recolle le fichier <b>firestore.rules</b> dans Firebase → Firestore Database → Règles → Publier, puis recharge la page.</span></div>`;
+  else if (S.syncErr) notice = `<div class="banner">${ic('lock')}<span>Connexion aux données interrompue. Vérifie ta connexion internet puis recharge la page.</span></div>`;
   $('#notice').innerHTML = notice;
 }
 function render(){
@@ -1144,7 +1145,7 @@ function roueView(){
 }
 VIEWS.coffre = () => `<div class="row" style="margin-bottom:14px"><div class="seg" role="group" aria-label="Coffre">
     <button data-a="ctab" data-t="inv" aria-pressed="${S.coffreTab==='inv'}">Inventaire</button><button data-a="ctab" data-t="roue" aria-pressed="${S.coffreTab==='roue'}">Roue de la semaine</button></div></div>
-  ${S.coffreTab === 'roue' ? roueView() : invView()}`;
+  ${S.coffreTab === 'roue' ? roueView() : invView('villa', {title:cfg().crewName || 'Crew', sub:'Coffre de la villa', cap:cfg().coffreCap || 2500, seed:INV_SEED})}`;
 
 /* ---------- Formations ---------- */
 function setForm(m, fid, status){
@@ -1515,11 +1516,11 @@ async function giveSanction(){
   render();
 }
 
-/* ---------- Inventaire du coffre ---------- */
-const INV_CATS = [{id:'all', label:'Tout afficher'}, {id:'armes', label:'Armes'}, {id:'muni', label:'Munitions'}, {id:'nourr', label:'Nourriture'}, {id:'vet', label:'Vêtements'}, {id:'divers', label:'Divers'}];
+/* ---------- Inventaire (coffre de la villa et coffres des labos) ---------- */
+const INV_CATS = [{id:'all', label:'Tout afficher'}, {id:'armes', label:'Armes'}, {id:'muni', label:'Munitions'}, {id:'nourr', label:'Nourriture'}, {id:'vet', label:'Vêtements'}, {id:'labo', label:'Labo'}, {id:'divers', label:'Divers'}];
 const INV_ICONS = {
   ammo:'<g stroke="#5a3a12" stroke-width="1.2"><path d="M14 18c0-5 3-9 3-9s3 4 3 9v20h-6z" fill="#e0a64a"/><path d="M22 16c0-5 3-9 3-9s3 4 3 9v22h-6z" fill="#f0b958"/><path d="M30 18c0-5 3-9 3-9s3 4 3 9v20h-6z" fill="#e0a64a"/></g><g fill="#b07b2c"><rect x="13" y="36" width="8" height="4" rx="1"/><rect x="21" y="36" width="8" height="4" rx="1"/><rect x="29" y="36" width="8" height="4" rx="1"/></g>',
-  cash:'<g transform="rotate(-12 24 24)"><rect x="7" y="16" width="34" height="18" rx="2" fill="#d9776a" stroke="#7a2f27" stroke-width="1.2"/><rect x="7" y="20" width="34" height="3" fill="#f3e3c8"/><rect x="5" y="22" width="34" height="18" rx="2" fill="#e88b7c" stroke="#7a2f27" stroke-width="1.2"/><circle cx="22" cy="31" r="4" fill="#f6d3c9"/></g>',
+  cash:'<g transform="rotate(-12 24 24)"><rect x="7" y="16" width="34" height="18" rx="2" fill="#7fae6a" stroke="#2f4d27" stroke-width="1.2"/><rect x="7" y="20" width="34" height="3" fill="#e9f0dc"/><rect x="5" y="22" width="34" height="18" rx="2" fill="#93c27c" stroke="#2f4d27" stroke-width="1.2"/><circle cx="22" cy="31" r="4" fill="#dbeccd"/></g>',
   pistol:'<path d="M8 15h30l2 3v5H26l-2 4h-5l-3 12H9l3-13-4-2z" fill="#5d6168" stroke="#22252a" stroke-width="1.3" stroke-linejoin="round"/><path d="M24 23v4" stroke="#22252a" stroke-width="1.3"/>',
   rifle:'<path d="M3 20h30l3-3h7v6H29l-3 3H17l-2 9H9l2-9H3z" fill="#4f545b" stroke="#202328" stroke-width="1.2" stroke-linejoin="round"/><path d="M33 20v6" stroke="#202328" stroke-width="1.2"/><rect x="21" y="26" width="4" height="8" rx="1" fill="#3a3e44"/>',
   knife:'<path d="M8 38 30 12c3-3 7-2 8 0L16 40z" fill="#c7ccd2" stroke="#4b5057" stroke-width="1.2"/><path d="m8 38 5 5 5-5-3-3z" fill="#3b2a1e"/>',
@@ -1529,31 +1530,35 @@ const INV_ICONS = {
   mask:'<ellipse cx="24" cy="24" rx="14" ry="16" fill="#a86a3c" stroke="#4e2f18" stroke-width="1.3"/><ellipse cx="18" cy="21" rx="3" ry="2.5" fill="#2b1a0e"/><ellipse cx="30" cy="21" rx="3" ry="2.5" fill="#2b1a0e"/><path d="M17 31c4 3 10 3 14 0" stroke="#2b1a0e" stroke-width="2" fill="none"/>',
   can:'<path d="M12 12h18l6 6v24H12z" fill="#d33a32" stroke="#6e1a15" stroke-width="1.3" stroke-linejoin="round"/><rect x="31" y="6" width="5" height="7" rx="1" fill="#2c2c2c"/><path d="m16 18 14 18M30 18 16 36" stroke="#9e2620" stroke-width="2"/>',
   tool:'<path d="M14 6l6 14M34 6l-6 14" stroke="#c9ccd1" stroke-width="3.5" stroke-linecap="round"/><circle cx="24" cy="22" r="3" fill="#6b6f75"/><path d="M22 24 12 42M26 24l10 18" stroke="#e0783a" stroke-width="5" stroke-linecap="round"/>',
-  drug:'<rect x="11" y="11" width="26" height="28" rx="2" fill="#eef2f6" stroke="#5a6470" stroke-width="1.2"/><path d="M11 19h26" stroke="#3f7fd6" stroke-width="3"/><circle cx="20" cy="29" r="3" fill="#3f7fd6"/><circle cx="29" cy="29" r="3" fill="#7fb3f0"/>',
+  chem:'<rect x="19" y="5" width="10" height="6" rx="1.5" fill="#2f3a4a"/><path d="M15 13h18l2 4v24a3 3 0 0 1-3 3H16a3 3 0 0 1-3-3V17z" fill="#e9eef4" stroke="#56606c" stroke-width="1.2"/><rect x="15" y="22" width="18" height="12" rx="1" fill="#3d7fd0"/><path d="M18 26h12M18 30h8" stroke="#dbe8f7" stroke-width="1.4"/>',
+  drug:'<path d="M12 14c0-3 2-5 5-5h14c3 0 5 2 5 5v22c0 3-2 5-5 5H17c-3 0-5-2-5-5z" fill="#eef2f6" fill-opacity=".85" stroke="#8a96a3" stroke-width="1.2"/><path d="M12 15h24" stroke="#8a96a3" stroke-width="1.5"/><circle cx="20" cy="26" r="3.5" fill="#fff" stroke="#c4ccd5"/><circle cx="28" cy="28" r="3.5" fill="#fff" stroke="#c4ccd5"/><circle cx="23" cy="33" r="3.5" fill="#fff" stroke="#c4ccd5"/>',
   box:'<path d="M8 16 24 9l16 7v18l-16 7-16-7z" fill="#b08a5a" stroke="#5a4127" stroke-width="1.3" stroke-linejoin="round"/><path d="m8 16 16 7 16-7M24 23v18" stroke="#5a4127" stroke-width="1.3" fill="none"/>'
 };
-const ICON_LABELS = {ammo:'Munitions', cash:'Billets', pistol:'Pistolet', rifle:'Fusil / SMG', knife:'Arme blanche', food:'Nourriture', vest:'Gilet', clothes:'Tenue', mask:'Masque', can:'Jerrycan', tool:'Outil', drug:'Produit', box:'Autre'};
+const ICON_LABELS = {ammo:'Munitions', cash:'Billets', pistol:'Pistolet', rifle:'Fusil / SMG', knife:'Arme blanche', food:'Nourriture', vest:'Gilet', clothes:'Tenue', mask:'Masque', can:'Jerrycan', tool:'Outil', chem:'Produit chimique', drug:'Pochon / drogue', box:'Autre'};
 function autoIcon(name, cat){
   const n = String(name).toLowerCase();
+  if (/pochon|ghb|weed|coke|meth[^y]|drogue|pilule|fentanyl/.test(n)) return 'drug';
   if (/balle|munition|ammo|mm\b|acp|gauge|magnum|rifle|\d+[.,]\d+x\d+|cartouche/.test(n)) return 'ammo';
-  if (/billet|argent|cash|\$/.test(n)) return 'cash';
+  if (/billet|argent|cash|\$|^\d+\s?[mk]$/.test(n)) return 'cash';
   if (/menu|repas|burger|sandwich|eau|boisson|nourriture|pizza/.test(n)) return 'food';
   if (/smg|fusil|carabine|ak|m4|uzi|shotgun|pompe/.test(n)) return 'rifle';
   if (/pistol|pistolet|revolver|glock|deagle/.test(n)) return 'pistol';
   if (/machette|couteau|batte|machete|knife/.test(n)) return 'knife';
   if (/gilet|kevlar|armure/.test(n)) return 'vest';
   if (/masque|cagoule/.test(n)) return 'mask';
-  if (/tenue|veste|pantalon|vetement|vêtement|t-shirt/.test(n)) return 'clothes';
-  if (/jerry|essence|bidon/.test(n)) return 'can';
+  if (/tenue|veste|pantalon|vetement|vêtement|t-shirt|course/.test(n)) return 'clothes';
+  if (/jerry|essence/.test(n)) return 'can';
+  if (/acide|catalyseur|base|solvant|m[ée]thylamine|chimique|r[ée]actif/.test(n)) return 'chem';
   if (/cisaille|pince|outil|perceuse|crochet|thermite|kit/.test(n)) return 'tool';
-  if (/ghb|weed|coke|meth|drogue|pilule/.test(n)) return 'drug';
-  return {armes:'pistol', muni:'ammo', nourr:'food', vet:'clothes'}[cat] || 'box';
+  return {armes:'pistol', muni:'ammo', nourr:'food', vet:'clothes', labo:'chem'}[cat] || 'box';
 }
 const invIcon = it => `<svg viewBox="0 0 48 48" aria-hidden="true">${INV_ICONS[it.icon] || INV_ICONS[autoIcon(it.name, it.cat)]}</svg>`;
 const fmtQty = n => new Intl.NumberFormat('fr-FR').format(n || 0);
 const fmtKg = kg => kg >= 1 ? `${kg.toFixed(2)}kg` : kg > 0 ? `${Math.round(kg*1000)}g` : '';
-const CAT_ORDER = ['muni','armes','nourr','vet','divers'];
-function invSorted(){ return S.inv.slice().sort((a,b) => CAT_ORDER.indexOf(a.cat) - CAT_ORDER.indexOf(b.cat) || a.name.localeCompare(b.name, 'fr')); }
+const CAT_ORDER = ['labo','muni','armes','nourr','vet','divers'];
+const placeOf = it => it.place || 'villa';
+const invItems = place => S.inv.filter(it => placeOf(it) === place);
+function invSorted(){ return invItems(S.invPlace).sort((a,b) => CAT_ORDER.indexOf(a.cat) - CAT_ORDER.indexOf(b.cat) || a.name.localeCompare(b.name, 'fr')); }
 function invFiltered(){ const q = (S.invQ || '').trim().toLowerCase(); return invSorted().filter(it => (S.invCat === 'all' || it.cat === S.invCat) && (!q || it.name.toLowerCase().includes(q))); }
 function tileHtml(it){
   const low = it.min && it.qty < it.min;
@@ -1564,14 +1569,18 @@ function tileHtml(it){
 }
 function gridHtml(){
   const l = invFiltered();
-  return l.length ? l.map(tileHtml).join('') : `<div class="empty" style="grid-column:1/-1">${S.inv.length ? 'Aucun objet ne correspond.' : 'Le coffre est vide pour l\'instant.'}</div>`;
+  return l.length ? l.map(tileHtml).join('') : `<div class="empty" style="grid-column:1/-1">${invItems(S.invPlace).length ? 'Aucun objet ne correspond.' : 'Ce coffre est vide pour l\'instant.'}</div>`;
 }
-function invView(){
-  const exec = isExec(); const cap = Number(cfg().coffreCap) || 2500;
-  const kg = S.inv.reduce((s, it) => s + (it.w || 0) * (it.qty || 0), 0);
-  const it = S.inv.find(x => x.id === S.invSel);
-  const lows = S.inv.filter(x => x.min && x.qty < x.min);
+// o = {title, sub, cap, seed, seedLabel}
+function invView(place, o){
+  if (S.invPlace !== place) { S.invPlace = place; S.invSel = null; S.invCat = 'all'; S.invQ = ''; }
+  S.invSeed = o.seed || null;
+  const exec = isExec(); const cap = Number(o.cap) || 2500; const items = invItems(place);
+  const kg = items.reduce((s, it) => s + (it.w || 0) * (it.qty || 0), 0);
+  const it = items.find(x => x.id === S.invSel);
+  const lows = items.filter(x => x.min && x.qty < x.min);
   const k = 'invdel:' + (it ? it.id : '');
+  const log = S.invlog.filter(l => (l.place || 'villa') === place);
   const detail = it ? `<div class="panel inv-detail"><div class="row"><span class="ti-big">${invIcon(it)}</span><div style="min-width:0"><h3 style="margin:0">${esc(it.name)}</h3><span class="fs" style="color:var(--muted);font-size:12px">${(INV_CATS.find(c => c.id === it.cat) || {}).label || ''}${it.w ? ` · ${fmtKg(it.w)} l'unité` : ''}${it.min ? ` · minimum ${fmtQty(it.min)}` : ''}</span></div><span class="spacer"></span><b class="num" style="font-size:22px">x${fmtQty(it.qty)}</b></div>
       <div class="row" style="margin-top:12px"><input class="inp num" id="mv-n" type="number" min="1" value="${S.mvN || 1}" style="width:110px" aria-label="Quantité">
         ${[1,10,100].map(n => `<button class="btn sm" data-a="mvq" data-n="${n}">${n}</button>`).join('')}</div>
@@ -1586,7 +1595,7 @@ function invView(){
       </div></details>` : ''}
     </div>` : `<div class="panel"><p class="hint" style="margin:0">Touche un objet pour déposer ou retirer.</p></div>`;
   return `<div class="inv-wrap">
-    <div class="inv-head"><span class="inv-ic">${ic('box')}</span><div><strong>${esc(cfg().crewName || 'Crew')}</strong><small>Coffre de la villa</small></div>
+    <div class="inv-head"><span class="inv-ic">${ic('box')}</span><div><strong>${esc(o.title)}</strong><small>${esc(o.sub)}</small></div>
       <div class="inv-kg"><b class="num">${kg.toFixed(1)}</b> / <span class="num">${fmtQty(cap)} kg</span><span class="kgbar"><i style="width:${Math.min(100, kg/cap*100)}%"></i></span></div></div>
     <div class="inv-search">${ic('target')}<input id="inv-q" data-c="invq" placeholder="Rechercher un objet" value="${esc(S.invQ||'')}" aria-label="Rechercher un objet"></div>
     <div class="inv-tabs" role="group" aria-label="Catégories">${INV_CATS.map(c => `<button data-a="invcat" data-c2="${c.id}" aria-pressed="${S.invCat===c.id}">${c.label}</button>`).join('')}</div>
@@ -1595,15 +1604,19 @@ function invView(){
       <div class="inv-grid" id="inv-grid">${gridHtml()}</div>
       <div class="stack">${detail}
         <div class="panel"><h3>Ajouter au coffre</h3><div class="stack" style="gap:8px;margin-top:8px">
-          <input class="inp" id="ia-name" maxlength="40" placeholder="Nom de l'objet (ex. Menus)" aria-label="Nom de l'objet">
-          <div class="row"><select class="inp" id="ia-cat" aria-label="Catégorie" style="flex:1">${INV_CATS.slice(1).map(c => `<option value="${c.id}" ${c.id===(S.invCat!=='all'?S.invCat:'divers')?'selected':''}>${c.label}</option>`).join('')}</select>
+          <input class="inp" id="ia-name" maxlength="40" placeholder="Nom de l'objet (ex. Acide)" aria-label="Nom de l'objet">
+          <div class="row"><select class="inp" id="ia-cat" aria-label="Catégorie" style="flex:1">${INV_CATS.slice(1).map(c => `<option value="${c.id}" ${c.id===(S.invCat!=='all'?S.invCat:(place==='villa'?'divers':'labo'))?'selected':''}>${c.label}</option>`).join('')}</select>
             <input class="inp num" id="ia-qty" type="number" min="1" value="1" style="width:90px" aria-label="Quantité"></div>
-          <label class="field">Poids unitaire en kg (facultatif)<input class="inp num" id="ia-w" type="number" min="0" step="0.001" placeholder="0.3"></label>
+          <label class="field">Poids unitaire en kg (facultatif)<input class="inp num" id="ia-w" type="number" min="0" step="0.001" placeholder="0.25"></label>
           <button class="btn pri" data-a="invadd">${ic('plus')}Ajouter</button></div></div>
-        ${!S.inv.length && exec ? `<div class="panel"><h3>Coffre vide</h3><p class="hint">Remplir avec le contenu de ta capture d'écran (munitions, armes, menus, tenues…), puis corriger les quantités.</p><button class="btn" data-a="invseed">Importer le contenu actuel</button></div>` : ''}
-        <div class="panel"><h3>Journal</h3>${S.invlog.length ? `<div class="hist">${S.invlog.map(l => `<div class="hist-r"><span><b style="color:${l.delta > 0 ? '#7ee08b' : '#ff8a8d'}" class="num">${l.delta > 0 ? '+' : ''}${fmtQty(l.delta)}</b> ${esc(l.item)}<br><small>${esc(l.by)} · ${ago(l.at)}</small></span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Chaque dépôt et retrait apparaîtra ici, avec qui l\'a fait.</p>'}</div>
+        ${!items.length && exec && o.seed ? `<div class="panel"><h3>Coffre vide</h3><p class="hint">${esc(o.seedLabel || 'Remplir avec le contenu de ta capture d\'écran, puis corriger les quantités.')}</p><button class="btn" data-a="invseed">Importer le contenu actuel</button></div>` : ''}
+        <div class="panel"><h3>Journal</h3>${log.length ? `<div class="hist">${log.map(l => `<div class="hist-r"><span><b style="color:${l.delta > 0 ? '#7ee08b' : '#ff8a8d'}" class="num">${l.delta > 0 ? '+' : ''}${fmtQty(l.delta)}</b> ${esc(l.item)}<br><small>${esc(l.by)} · ${ago(l.at)}</small></span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Chaque dépôt et retrait apparaîtra ici, avec qui l\'a fait.</p>'}</div>
       </div>
     </div></div>`;
+}
+function invLog(it, delta, at, note){
+  const by = me().name, byId = me().id;
+  return Store.write('invlog/' + uid('l'), {at, itemId:it.id, item:it.name + (note ? ` (${note})` : ''), delta, by, byId, place:placeOf(it)});
 }
 async function invMove(it, delta){
   if (!me() || !it || !delta) return;
@@ -1611,9 +1624,10 @@ async function invMove(it, delta){
   const by = me().name, byId = me().id, at = Date.now();
   it.qty = (it.qty || 0) + delta; it.by = by; it.at = at; render();
   const ok = await Store.incr('inv/' + it.id, delta, {at, by, byId});
-  if (ok) { Store.write('invlog/' + uid('l'), {at, itemId:it.id, item:it.name, delta, by, byId}); toast(`${delta > 0 ? 'Déposé' : 'Retiré'} : ${fmtQty(Math.abs(delta))} ${it.name}.`); }
+  if (ok) { invLog(it, delta, at); toast(`${delta > 0 ? 'Déposé' : 'Retiré'} : ${fmtQty(Math.abs(delta))} ${it.name}.`); }
 }
-function invNewDoc(name, cat, qty, w){ return {name, cat, qty, w: w || 0, min: 0, icon: '', at: Date.now(), by: me() ? me().name : '?', byId: me() ? me().id : ''}; }
+function invNewDoc(name, cat, qty, w, place, icon){ return {name, cat, qty, w: w || 0, min: 0, icon: icon || '', place: place || 'villa', at: Date.now(), by: me() ? me().name : '?', byId: me() ? me().id : ''}; }
+function newInvId(name){ let id = slug(name); while (S.inv.some(x => x.id === id)) id += '-2'; return id; }
 const INV_SEED = [
   ['7.62x39','muni',1000],['7.62x51','muni',1000],['.45 ACP','muni',1000],['9mm','muni',1000],['12 Gauge','muni',1000],['5.56x45','muni',1019],['.44 Magnum','muni',1004],['.22 Long Rifle','muni',1082],
   ['Combat Pistol','armes',1],['Assault SMG','armes',1],['Marksman Pistol','armes',3],['Micro SMG','armes',1],['Machete','armes',1],
@@ -1621,143 +1635,227 @@ const INV_SEED = [
   ['Tenue','vet',14,0.5],['Gilet pare-balles','vet',2,0.03],['Masque','vet',1,0.03],
   ['Cisaille','divers',2,3],['JerryCan','divers',1,2],['GHB','divers',1,0.5]
 ];
+const LAB_SEED = [
+  ['Acide','labo',86,0.25],['Catalyseur','labo',64,0.25],['Base opioïde','labo',63,0.25],['Solvant','labo',40,0.25],
+  ['Pochon de fentanyl','labo',20,0.2],['Méthylamine','labo',100,0.25],['Cisaille','divers',1,3],['JerryCan','divers',1,2],['Course blanche','vet',1,0.5]
+];
 
 /* ---------- Laboratoires ---------- */
-// Recette de synthèse. Pour ajouter une drogue plus tard : une nouvelle entrée ici.
+// Recette par défaut ; les Exécutants et plus peuvent la corriger (onglet Réglages), elle est alors enregistrée dans config.recipes.
 const RECIPES = {
   fentanyl: {id:'fentanyl', name:'Fentanyl', type:'synthese',
     inputs:[{name:'Acide', qty:10}, {name:'Catalyseur', qty:10}, {name:'Base opioïde', qty:10}, {name:'Solvant', qty:20}],
     plates:10, fridgeMin:16, output:{name:'Pochon de fentanyl', qty:20}}
 };
+function recipe(id){
+  const base = RECIPES[id]; if (!base) return null;
+  const o = (cfg().recipes || {})[id]; if (!o) return base;
+  return Object.assign({}, base, o, {inputs: base.inputs.map((i, k) => Object.assign({}, i, (o.inputs || [])[k] || {})), output: Object.assign({}, base.output, o.output || {})});
+}
+const labSites = () => cfg().labSites || [];
+const siteOf = b => labSites().find(x => x.id === b.site) || (!b.site ? labSites()[0] : null);
+const curSite = () => labSites().find(x => x.id === S.labSite) || labSites()[0] || null;
+const sitePlace = s => 'lab:' + s.id;
 const normName = x => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/s$/, '').trim();
-const invByName = name => S.inv.find(x => normName(x.name) === normName(name));
-const possibleBatches = r => Math.min(...r.inputs.map(i => { const it = invByName(i.name); return it ? Math.floor((it.qty || 0) / i.qty) : 0; }));
+const invByName = (name, place) => S.inv.find(x => placeOf(x) === (place || 'villa') && normName(x.name) === normName(name));
+const possibleBatches = (r, place) => Math.min(...r.inputs.map(i => { const it = invByName(i.name, place); return it ? Math.floor((it.qty || 0) / i.qty) : 0; }));
 const mmss = ms => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
-const fridgeEnd = b => (b.fridgeAt || 0) + RECIPES[b.recipe].fridgeMin * 60000;
+const fridgeEnd = b => (b.fridgeAt || 0) + (b.fridgeMin || (recipe(b.recipe) || {}).fridgeMin || 16) * 60000;
 const LAB_STEPS = [{id:'cuve', label:'Cuve'}, {id:'frigo', label:'Réfrigérateur'}, {id:'fini', label:'Pochons'}];
+const STEP_LABEL = {cuve:'cuve', frigo:'frigo', fini:'pochons', corr:'correction'};
 
-// Mouvement silencieux dans l'inventaire du coffre (crée l'objet s'il n'existe pas).
-async function invAdjust(name, delta, cat, icon, note){
+// Mouvement dans un coffre (crée l'objet s'il n'existe pas).
+async function invAdjust(name, delta, cat, icon, note, place){
   if (!me() || !delta) return false;
-  const by = me().name, byId = me().id, at = Date.now();
-  let it = invByName(name);
+  const at = Date.now();
+  let it = invByName(name, place);
   if (!it) {
     if (delta < 0) return false;
-    let id = slug(name); while (S.inv.some(x => x.id === id)) id += '-2';
-    const d = Object.assign(invNewDoc(name, cat || 'divers', delta, 0), {icon: icon || ''});
-    S.inv.push(Object.assign({}, d, {id}));
+    const id = newInvId(name);
+    const d = invNewDoc(name, cat || 'labo', delta, 0, place, icon);
+    it = Object.assign({}, d, {id}); S.inv.push(it);
     const ok = await Store.write('inv/' + id, d);
-    if (ok) Store.write('invlog/' + uid('l'), {at, itemId:id, item:name + (note ? ` (${note})` : ''), delta, by, byId});
+    if (ok) invLog(it, delta, at, note);
     return ok;
   }
   if ((it.qty || 0) + delta < 0) return false;
   it.qty = (it.qty || 0) + delta;
-  const ok = await Store.incr('inv/' + it.id, delta, {at, by, byId});
-  if (ok) Store.write('invlog/' + uid('l'), {at, itemId:it.id, item:it.name + (note ? ` (${note})` : ''), delta, by, byId});
+  const ok = await Store.incr('inv/' + it.id, delta, {at, by:me().name, byId:me().id});
+  if (ok) invLog(it, delta, at, note);
   return ok;
 }
 function labStepper(b){
   const idx = {cuve:0, frigo:1, fini:2}[b.status];
   return `<ol class="lsteps">${LAB_STEPS.map((st, i) => `<li class="${i < idx || b.status === 'fini' ? 'done' : i === idx ? 'cur' : ''}"><b>${i < idx || b.status === 'fini' ? ic('check') : i + 1}</b>${st.label}</li>`).join('')}</ol>`;
 }
+function batchFixForm(b, r){
+  const id = esc(b.id); const left = Math.max(0, Math.ceil((fridgeEnd(b) - Date.now()) / 60000));
+  return `<details class="edit" data-edit="${esc(b.id)}" ${S.labEdit === b.id ? 'open' : ''}><summary>Corriger cette production</summary><div class="stack" style="gap:8px;margin-top:10px">
+    <div class="row"><label class="field" style="flex:1;min-width:130px">Labo<select class="inp" id="be-site-${id}">${labSites().map(s => `<option value="${esc(s.id)}" ${siteOf(b) && siteOf(b).id === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+      <label class="field" style="flex:1;min-width:130px">Étape<select class="inp" id="be-st-${id}">${LAB_STEPS.map(st => `<option value="${st.id}" ${st.id === b.status ? 'selected' : ''}>${st.label}</option>`).join('')}</select></label></div>
+    <div class="row"><label class="field" style="flex:1">Minutes restantes au frigo<input class="inp num" id="be-min-${id}" type="number" min="0" max="240" value="${b.status === 'frigo' ? left : r.fridgeMin}"></label>
+      <label class="field" style="flex:1">Pochons obtenus<input class="inp num" id="be-po-${id}" type="number" min="0" value="${b.pochons != null ? b.pochons : r.output.qty}"></label></div>
+    <p class="hint" style="margin:0">Corriger ne change pas le coffre : ajuste-le à la main si besoin (onglet Coffre du labo).</p>
+    <div class="row"><button class="btn pri sm" data-a="labfix" data-id="${id}">Enregistrer la correction</button></div>
+  </div></details>`;
+}
 function batchCard(b){
-  const r = RECIPES[b.recipe]; if (!r) return '';
-  const k = 'labdel:' + b.id; const now = Date.now();
+  const r = recipe(b.recipe); if (!r) return '';
+  const k = 'labdel:' + b.id; const now = Date.now(); const site = siteOf(b);
   let body = '', act = '';
   if (b.status === 'cuve') {
     body = `<p>Les ingrédients sont dans la cuve. Extrais les <b>${r.plates} plaquettes</b> et mets-les au réfrigérateur.</p>`;
     act = `<button class="btn pri" data-a="labnext" data-id="${esc(b.id)}">${ic('right')}Extraire et mettre au frigo</button>`;
   } else if (b.status === 'frigo') {
-    const left = fridgeEnd(b) - now; const ready = left <= 0;
+    const left = fridgeEnd(b) - now; const ready = left <= 0; const len = (b.fridgeMin || r.fridgeMin) * 60000;
     body = `<div class="fridge ${ready ? 'ready' : ''}"><span class="lbl">${ready ? 'Plaquettes prêtes' : 'Au réfrigérateur'}</span><b class="num" data-until="${fridgeEnd(b)}">${ready ? 'Prêt' : mmss(left)}</b>
-      <span class="fbar"><i data-bar="${fridgeEnd(b)}" data-len="${r.fridgeMin * 60000}" style="width:${Math.min(100, 100 - left / (r.fridgeMin * 600))}%"></i></span></div>
+      <span class="fbar"><i data-bar="${fridgeEnd(b)}" data-len="${len}" style="width:${Math.min(100, Math.max(0, 100 - left / len * 100))}%"></i></span></div>
       <p>Ensuite : casser les ${r.plates} plaquettes et les mettre en <b>${r.output.qty} pochons</b>.</p>`;
     act = ready || S.confirm === 'early:' + b.id
-      ? `<label class="check"><input type="checkbox" id="tocoffre-${esc(b.id)}" checked>Ranger les ${r.output.qty} pochons dans le coffre</label><button class="btn ${ready ? 'ok' : 'red'}" data-a="labnext" data-id="${esc(b.id)}">${ic('check')}${ready ? 'Casser et mettre en pochons' : 'Confirmer : sortir avant la fin'}</button>`
+      ? `<label class="check"><input type="checkbox" id="tocoffre-${esc(b.id)}" checked>Ranger les ${r.output.qty} pochons dans le coffre du labo</label><button class="btn ${ready ? 'ok' : 'red'}" data-a="labnext" data-id="${esc(b.id)}">${ic('check')}${ready ? 'Casser et mettre en pochons' : 'Confirmer : sortir avant la fin'}</button>`
       : `<button class="btn" disabled>Casser et mettre en pochons</button><button class="btn ghost sm" data-a="askconfirm" data-k="early:${esc(b.id)}">Déjà fini en jeu ?</button>`;
+  } else {
+    body = `<p>Terminée ${fmtDT(b.doneAt)} : <b>${fmtQty(b.pochons != null ? b.pochons : r.output.qty)} pochons</b>${b.toCoffre ? ' rangés au coffre du labo' : ''}.</p>`;
+    act = `<button class="btn sm" data-a="labeditclose">Fermer</button>`;
   }
-  const who = (b.log || []).map(l => `${esc(l.by)} (${{cuve:'cuve', frigo:'frigo', fini:'pochons'}[l.step]})`).join(' · ');
+  const who = (b.log || []).map(l => `${esc(l.by)} (${STEP_LABEL[l.step] || l.step})`).join(' · ');
   return `<article class="batch ${b.status}">
-    <div class="row"><span class="fi" style="--pc:var(--p-neg)">${ic('flask')}</span><div style="min-width:0"><h4>${esc(r.name)} · ${esc(b.lab || 'Labo')}</h4><span class="meta">Lancée par ${esc(b.by)} · ${ago(b.startedAt)}</span></div><span class="spacer"></span>
-      ${isExec() ? (S.confirm === k ? `<button class="btn red sm" data-a="labdel" data-id="${esc(b.id)}">Annuler la cuve</button><button class="btn sm" data-a="noconfirm">Non</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}" aria-label="Annuler cette cuve">${ic('x')}</button>`) : ''}</div>
+    <div class="row"><span class="fi" style="--pc:var(--p-neg)">${ic('flask')}</span><div style="min-width:0"><h4>${esc(r.name)} · ${esc(site ? site.name : (b.lab || 'Labo'))}</h4><span class="meta">Lancée par ${esc(b.by)} · ${ago(b.startedAt)}</span></div><span class="spacer"></span>
+      ${isExec() ? (S.confirm === k ? `<button class="btn red sm" data-a="labdel" data-id="${esc(b.id)}">Supprimer</button><button class="btn sm" data-a="noconfirm">Non</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}" aria-label="Supprimer cette production">${ic('trash')}</button>`) : ''}</div>
     ${labStepper(b)}${body}
     <div class="row">${act}</div>
     ${who ? `<p class="hint" style="margin:0;font-size:11.5px">${who}</p>` : ''}
+    ${isExec() ? batchFixForm(b, r) : ''}
   </article>`;
 }
-VIEWS.labos = () => {
-  const r = RECIPES.fentanyl;
-  const tab = S.labTab || 'synthese';
-  const head = `<div class="row" style="margin-bottom:14px"><div class="seg" role="group" aria-label="Type de laboratoire">
-      <button data-a="labtab" data-t="synthese" aria-pressed="${tab==='synthese'}">Synthèse</button><button data-a="labtab" data-t="culture" aria-pressed="${tab==='culture'}">Culture</button></div></div>`;
-  if (tab === 'culture') return head + `<div class="empty"><strong>Laboratoires de culture</strong>Bientôt : explique-moi comment marchent vos cultures et je les ajoute ici.</div>`;
-  const active = S.labs.filter(b => b.status !== 'fini').sort((a, b) => a.startedAt - b.startedAt);
-  const done = S.labs.filter(b => b.status === 'fini').sort((a, b) => b.doneAt - a.doneAt);
+function siteForm(){
+  return `<div class="panel"><h3>Ajouter un labo de synthèse</h3><div class="row" style="align-items:flex-end;margin-top:8px">
+    <label class="field" style="flex:1;min-width:150px" for="ns-name">Nom du labo<input class="inp" id="ns-name" maxlength="30" placeholder="Roxwood"></label>
+    <label class="field" for="ns-cap">Capacité du coffre (kg)<input class="inp num" id="ns-cap" type="number" min="1" value="1500" style="width:120px"></label>
+    <button class="btn pri" data-a="siteadd">${ic('plus')}Ajouter</button></div></div>`;
+}
+function labProduction(site, r){
+  const place = sitePlace(site);
+  const mine = b => { const s = siteOf(b); return s && s.id === site.id; };
+  const active = S.labs.filter(b => b.status !== 'fini' && mine(b)).sort((a, b) => a.startedAt - b.startedAt);
+  const edited = S.labs.find(b => b.id === S.labEdit && b.status === 'fini');
+  const done = S.labs.filter(b => b.status === 'fini' && mine(b)).sort((a, b) => b.doneAt - a.doneAt);
   const wk = isoWeek(new Date()).id;
   const weekDone = done.filter(b => isoWeek(new Date(b.doneAt)).id === wk);
+  const weekPochons = weekDone.reduce((s, b) => s + (b.pochons != null ? b.pochons : r.output.qty), 0);
   const nextOut = active.filter(b => b.status === 'frigo').map(fridgeEnd).sort((a, b) => a - b)[0];
   const n = Math.max(1, Math.min(20, S.labN || 1));
-  const can = possibleBatches(r);
-  const workers = {}; S.labs.forEach(b => (b.log || []).forEach(l => { if (isoWeek(new Date(l.at)).id === wk) workers[l.by] = (workers[l.by] || 0) + 1; }));
+  const can = possibleBatches(r, place);
+  const workers = {}; S.labs.filter(mine).forEach(b => (b.log || []).forEach(l => { if (l.step !== 'corr' && isoWeek(new Date(l.at)).id === wk) workers[l.by] = (workers[l.by] || 0) + 1; }));
   const lb = Object.entries(workers).sort((a, b) => b[1] - a[1]); const mx = lb.length ? lb[0][1] : 1;
-  const labNames = [...new Set(S.labs.map(b => b.lab).filter(Boolean))];
-  const rows = r.inputs.map(i => { const it = invByName(i.name); const have = it ? it.qty || 0 : 0; const need = i.qty * n;
+  const rows = r.inputs.map(i => { const it = invByName(i.name, place); const have = it ? it.qty || 0 : 0; const need = i.qty * n;
     return `<tr><td>${esc(i.name)}</td><td class="num">${fmtQty(need)}</td><td class="num" style="color:${have >= need ? '#7ee08b' : '#ff8a8d'}">${it ? fmtQty(have) : 'absent'}</td></tr>`; }).join('');
   const enough = can >= n;
-  return head + `<div class="kpis">
+  return `<div class="kpis">
       <div class="kpi"><small>Cuves en cours</small><b>${active.length}</b><span>${active.filter(b => b.status === 'frigo').length} au frigo</span></div>
       <div class="kpi"><small>Prochaine sortie de frigo</small><b class="num" ${nextOut ? `data-until="${nextOut}"` : ''}>${nextOut ? (nextOut <= Date.now() ? 'Prêt' : mmss(nextOut - Date.now())) : '—'}</b><span>${nextOut ? 'minutes restantes' : 'rien au frigo'}</span></div>
-      <div class="kpi"><small>Pochons cette semaine</small><b>${fmtQty(weekDone.length * r.output.qty)}</b><span>${weekDone.length} cuve${weekDone.length > 1 ? 's' : ''} terminée${weekDone.length > 1 ? 's' : ''}</span></div>
-      <div class="kpi"><small>Possible avec le coffre</small><b>${can}</b><span>cuve${can > 1 ? 's' : ''} de ${r.name.toLowerCase()}</span></div>
+      <div class="kpi"><small>Pochons cette semaine</small><b>${fmtQty(weekPochons)}</b><span>${weekDone.length} cuve${weekDone.length > 1 ? 's' : ''} terminée${weekDone.length > 1 ? 's' : ''}</span></div>
+      <div class="kpi"><small>Possible avec le coffre du labo</small><b>${can}</b><span>cuve${can > 1 ? 's' : ''} de ${r.name.toLowerCase()}</span></div>
     </div>
     <div class="cols"><div class="stack">
+      ${edited ? batchCard(edited) : ''}
       ${active.length ? active.map(batchCard).join('') : `<div class="empty"><strong>Aucune cuve en cours</strong>Lance une cuve avec le panneau « Nouvelle cuve ».</div>`}
-      <div class="panel"><h3>Historique</h3>${done.length ? `<div class="hist">${done.slice(0, 15).map(b => `<div class="hist-r"><span><b>${fmtQty(r.output.qty)} pochons</b> · ${esc(b.lab || 'Labo')}<br><small>${fmtDT(b.doneAt)} · ${(b.log || []).map(l => esc(l.by)).filter((v, i, a) => a.indexOf(v) === i).join(', ')}</small></span><span class="st-pill ${b.toCoffre ? 'ok' : 'wait'}">${b.toCoffre ? 'Rangé au coffre' : 'Pas au coffre'}</span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Les cuves terminées apparaîtront ici.</p>'}</div>
+      <div class="panel"><h3>Historique</h3>${done.length ? `<div class="hist">${done.slice(0, 20).map(b => `<div class="hist-r"><span><b>${fmtQty(b.pochons != null ? b.pochons : r.output.qty)} pochons</b>${(b.log || []).some(l => l.step === 'corr') ? ' <span class="st-pill wait">corrigé</span>' : ''}<br><small>${fmtDT(b.doneAt)} · ${(b.log || []).filter(l => l.step !== 'corr').map(l => esc(l.by)).filter((v, i, a) => a.indexOf(v) === i).join(', ')}</small></span>
+          <span>${isExec() ? `<button class="btn ghost sm" data-a="labedit" data-id="${esc(b.id)}">Corriger</button>` : `<span class="st-pill ${b.toCoffre ? 'ok' : 'wait'}">${b.toCoffre ? 'Au coffre' : 'Pas au coffre'}</span>`}</span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Les cuves terminées apparaîtront ici.</p>'}</div>
     </div>
     <div class="stack">
-      <div class="panel"><h3>Nouvelle cuve · ${r.name}</h3><p class="hint">1 cuve = ${r.inputs.map(i => `${i.qty} ${i.name.toLowerCase()}`).join(', ')} → ${r.plates} plaquettes → ${r.fridgeMin} min au frigo → ${r.output.qty} pochons.</p>
-        <div class="row" style="align-items:flex-end">
-          <label class="field" for="lab-n">Nombre de cuves<input class="inp num" id="lab-n" data-c="labn" type="number" min="1" max="20" value="${n}" style="width:90px"></label>
-          <label class="field" for="lab-name" style="flex:1;min-width:140px">Labo<input class="inp" id="lab-name" list="lab-names" maxlength="30" value="${esc(S.labName || labNames[0] || 'Labo de synthèse')}"><datalist id="lab-names">${labNames.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>
-        </div>
-        <div class="tbl-wrap" style="margin-top:12px"><table><thead><tr><th>Ingrédient</th><th>Il faut</th><th>Au coffre</th></tr></thead><tbody>${rows}
+      <div class="panel"><h3>Nouvelle cuve · ${esc(r.name)}</h3><p class="hint">1 cuve = ${r.inputs.map(i => `${i.qty} ${i.name.toLowerCase()}`).join(', ')} → ${r.plates} plaquettes → ${r.fridgeMin} min au frigo → ${r.output.qty} pochons.</p>
+        <label class="field" for="lab-n">Nombre de cuves<input class="inp num" id="lab-n" data-c="labn" type="number" min="1" max="20" value="${n}" style="width:90px"></label>
+        <div class="tbl-wrap" style="margin-top:12px"><table><thead><tr><th>Ingrédient</th><th>Il faut</th><th>Coffre du labo</th></tr></thead><tbody>${rows}
           <tr><td><b>Résultat</b></td><td class="num" colspan="2"><b>${fmtQty(r.plates * n)} plaquettes → ${fmtQty(r.output.qty * n)} pochons</b></td></tr></tbody></table></div>
-        <label class="check" style="margin-top:12px"><input type="checkbox" id="lab-fromcoffre" ${enough ? 'checked' : 'disabled'}>Prendre les ingrédients dans le coffre${enough ? '' : ' (pas assez au coffre)'}</label>
+        <label class="check" style="margin-top:12px"><input type="checkbox" id="lab-fromcoffre" ${enough ? 'checked' : 'disabled'}>Prendre les ingrédients dans le coffre du labo${enough ? '' : ' (pas assez)'}</label>
         <div class="row" style="margin-top:12px"><button class="btn pri" data-a="labstart" ${me() ? '' : 'disabled'}>${ic('flask')}Lancer ${n > 1 ? `${n} cuves` : 'la cuve'}</button></div>
       </div>
       <div class="panel"><h3>Qui a travaillé cette semaine</h3>${lb.length ? `<div class="lb">${lb.map(([nm, c], i) => `<div class="lb-r"><span class="rk">${i + 1}</span><span class="nm"><span>${esc(nm)}</span><span class="track"><i style="width:${Math.max(4, c / mx * 100)}%"></i></span></span><span class="v">${c} étape${c > 1 ? 's' : ''}</span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Chaque étape (cuve, frigo, pochons) compte pour celui qui la fait.</p>'}</div>
     </div></div>`;
+}
+function labSettings(site, r){
+  const exec = isExec(); const dis = exec ? '' : 'disabled';
+  return `<div class="cols"><div class="stack">
+    <div class="panel"><h3>Recette · ${esc(r.name)}</h3><p class="hint">${exec ? 'Corrige les quantités si le jeu a changé. Ça vaut pour tous les labos.' : 'Seuls les Exécutants et plus peuvent modifier la recette.'}</p>
+      <div class="stack" style="gap:8px">${r.inputs.map((i, k) => `<div class="row"><span style="flex:1">${esc(i.name)}</span><input class="inp num" id="rc-in-${k}" type="number" min="0" value="${i.qty}" style="width:100px" ${dis} aria-label="${esc(i.name)}"></div>`).join('')}
+        <div class="row"><span style="flex:1">Plaquettes extraites</span><input class="inp num" id="rc-plates" type="number" min="1" value="${r.plates}" style="width:100px" ${dis} aria-label="Plaquettes"></div>
+        <div class="row"><span style="flex:1">Minutes au réfrigérateur</span><input class="inp num" id="rc-fridge" type="number" min="1" value="${r.fridgeMin}" style="width:100px" ${dis} aria-label="Minutes au frigo"></div>
+        <div class="row"><span style="flex:1">Pochons obtenus</span><input class="inp num" id="rc-out" type="number" min="1" value="${r.output.qty}" style="width:100px" ${dis} aria-label="Pochons obtenus"></div>
+        ${exec ? `<div class="row"><button class="btn pri sm" data-a="recipesave">Enregistrer la recette</button>${(cfg().recipes || {})[r.id] ? `<button class="btn ghost sm" data-a="recipereset">Revenir à la recette d'origine</button>` : ''}</div>` : ''}</div></div>
+  </div><div class="stack">
+    <div class="panel"><h3>Labo · ${esc(site.name)}</h3>
+      <div class="row" style="align-items:flex-end">
+        <label class="field" style="flex:1;min-width:140px" for="st-name">Nom<input class="inp" id="st-name" maxlength="30" value="${esc(site.name)}" ${dis}></label>
+        <label class="field" for="st-cap">Capacité du coffre (kg)<input class="inp num" id="st-cap" type="number" min="1" value="${site.cap || 1500}" style="width:120px" ${dis}></label></div>
+      ${exec ? `<div class="row" style="margin-top:10px"><button class="btn pri sm" data-a="sitesave">Enregistrer</button><span class="spacer"></span>${S.confirm === 'sitedel' ? `<button class="btn red sm" data-a="sitedel">Confirmer</button><button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="sitedel">${ic('trash')}Retirer ce labo</button>`}</div>` : ''}
+    </div>
+    ${exec ? siteForm() : ''}
+  </div></div>`;
+}
+VIEWS.labos = () => {
+  const r = recipe('fentanyl');
+  const tab = S.labTab || 'synthese';
+  const head = `<div class="row" style="margin-bottom:14px"><div class="seg" role="group" aria-label="Type de laboratoire">
+      <button data-a="labtab" data-t="synthese" aria-pressed="${tab==='synthese'}">Synthèse</button><button data-a="labtab" data-t="culture" aria-pressed="${tab==='culture'}">Culture</button></div></div>`;
+  if (tab === 'culture') return head + `<div class="empty"><strong>Laboratoires de culture</strong>Bientôt : explique-moi comment marchent vos cultures et je les ajoute ici.</div>`;
+  const site = curSite();
+  if (!site) return head + (isExec() ? siteForm() : `<div class="empty"><strong>Aucun labo enregistré</strong>Un Exécutant doit ajouter le labo (son nom et la capacité de son coffre).</div>`);
+  const sub = S.labSub || 'prod';
+  const bar = `<div class="row" style="margin-bottom:14px;gap:8px">
+      ${labSites().length > 1 ? `<div class="seg" role="group" aria-label="Labo">${labSites().map(s => `<button data-a="labsite" data-id="${esc(s.id)}" aria-pressed="${s.id === site.id}">${esc(s.name)}</button>`).join('')}</div>` : `<b style="font-size:15px;text-transform:uppercase">${esc(site.name)}</b>`}
+      <span class="spacer"></span>
+      <div class="seg" role="group" aria-label="Section"><button data-a="labsub" data-t="prod" aria-pressed="${sub==='prod'}">Production</button><button data-a="labsub" data-t="coffre" aria-pressed="${sub==='coffre'}">Coffre du labo</button><button data-a="labsub" data-t="reglages" aria-pressed="${sub==='reglages'}">Réglages</button></div></div>`;
+  if (sub === 'coffre') return head + bar + invView(sitePlace(site), {title:site.name, sub:'Coffre du labo de synthèse', cap:site.cap || 1500, seed:LAB_SEED, seedLabel:'Remplir avec le contenu de ta capture du coffre de Roxwood (acide, catalyseur, base opioïde, solvant, pochons, méthylamine…), puis corriger les quantités.'});
+  if (sub === 'reglages') return head + bar + labSettings(site, r);
+  return head + bar + labProduction(site, r);
 };
 async function labStart(){
-  if (!me()) return;
-  const r = RECIPES.fentanyl;
+  const site = curSite(); if (!me() || !site) return;
+  const r = recipe('fentanyl'); const place = sitePlace(site);
   const n = Math.max(1, Math.min(20, parseInt(($('#lab-n') || {}).value, 10) || 1));
-  const lab = (($('#lab-name') || {}).value || '').trim().slice(0, 30) || 'Labo de synthèse'; S.labName = lab;
   const fromCoffre = !!(($('#lab-fromcoffre') || {}).checked);
-  if (fromCoffre && possibleBatches(r) < n) { toast("Pas assez d'ingrédients au coffre."); return; }
+  if (fromCoffre && possibleBatches(r, place) < n) { toast("Pas assez d'ingrédients dans le coffre du labo."); return; }
   const at = Date.now(), by = me().name, byId = me().id;
-  if (fromCoffre) for (const i of r.inputs) await invAdjust(i.name, -i.qty * n, 'divers', 'drug', `labo ${lab}`);
+  if (fromCoffre) for (const i of r.inputs) await invAdjust(i.name, -i.qty * n, 'labo', 'chem', 'cuve', place);
   for (let k = 0; k < n; k++) {
     const id = uid('lab');
-    const d = {recipe:r.id, lab, status:'cuve', startedAt:at + k, by, byId, fromCoffre, log:[{step:'cuve', at, by, byId}], lastById:byId, lastAt:at};
+    const d = {recipe:r.id, site:site.id, lab:site.name, status:'cuve', startedAt:at + k, by, byId, fromCoffre, log:[{step:'cuve', at, by, byId}], lastById:byId, lastAt:at};
     S.labs.push(Object.assign({}, d, {id})); await Store.write('labs/' + id, d);
   }
   toast(n > 1 ? `${n} cuves lancées.` : 'Cuve lancée.'); render();
 }
 async function labNext(id){
   const b = S.labs.find(x => x.id === id); if (!b || !me()) return;
-  const r = RECIPES[b.recipe]; const at = Date.now(), by = me().name, byId = me().id;
+  const r = recipe(b.recipe); const site = siteOf(b); const at = Date.now(), by = me().name, byId = me().id;
   const d = Object.assign({}, b); delete d.id;
   d.log = (b.log || []).slice(); d.lastById = byId; d.lastAt = at;
-  if (b.status === 'cuve') { d.status = 'frigo'; d.fridgeAt = at; d.log.push({step:'frigo', at, by, byId}); }
+  if (b.status === 'cuve') { d.status = 'frigo'; d.fridgeAt = at; d.fridgeMin = r.fridgeMin; d.log.push({step:'frigo', at, by, byId}); }
   else if (b.status === 'frigo') {
     const box = $('#tocoffre-' + b.id); d.toCoffre = box ? box.checked : true;
     d.status = 'fini'; d.doneAt = at; d.pochons = r.output.qty; d.log.push({step:'fini', at, by, byId});
   } else return;
   S.confirm = null; Object.assign(b, d);
   const ok = await Store.write('labs/' + id, d);
-  if (ok && d.status === 'fini' && d.toCoffre) await invAdjust(r.output.name, r.output.qty, 'divers', 'drug', `labo ${b.lab || ''}`.trim());
-  if (ok) toast(d.status === 'frigo' ? `${r.plates} plaquettes au frigo pour ${r.fridgeMin} minutes.` : `${r.output.qty} pochons prêts${d.toCoffre ? ' et rangés au coffre' : ''}.`);
+  if (ok && d.status === 'fini' && d.toCoffre && site) await invAdjust(r.output.name, r.output.qty, 'labo', 'drug', 'pochons', sitePlace(site));
+  if (ok) toast(d.status === 'frigo' ? `${r.plates} plaquettes au frigo pour ${r.fridgeMin} minutes.` : `${r.output.qty} pochons prêts${d.toCoffre ? ' et rangés au coffre du labo' : ''}.`);
+  render();
+}
+async function labFix(id){
+  const b = S.labs.find(x => x.id === id); if (!b || !isExec()) return;
+  const r = recipe(b.recipe); const at = Date.now();
+  const val = s => ($(s + '-' + id) || {}).value;
+  const site = labSites().find(s => s.id === val('#be-site')) || siteOf(b);
+  const st = val('#be-st') || b.status;
+  const d = Object.assign({}, b); delete d.id;
+  d.site = site ? site.id : d.site; d.lab = site ? site.name : d.lab; d.status = st;
+  if (st === 'frigo') { const left = Math.max(0, parseInt(val('#be-min'), 10) || 0); d.fridgeMin = r.fridgeMin; d.fridgeAt = at - (r.fridgeMin - left) * 60000; delete d.doneAt; }
+  if (st === 'fini') { d.doneAt = b.doneAt || at; d.pochons = Math.max(0, parseInt(val('#be-po'), 10) || 0); }
+  if (st === 'cuve') { delete d.fridgeAt; delete d.doneAt; }
+  d.log = (b.log || []).concat([{step:'corr', at, by:me().name, byId:me().id}]); d.lastById = me().id; d.lastAt = at;
+  Object.assign(b, d); S.labEdit = null;
+  const ok = await Store.write('labs/' + id, d);
+  if (ok) toast('Production corrigée.');
   render();
 }
 // Compte à rebours en direct + bip quand le frigo est prêt (si la page est ouverte).
@@ -1768,8 +1866,8 @@ const fridgeNotified = new Set();
 setInterval(() => {
   const now = Date.now();
   S.labs.filter(b => b.status === 'frigo').forEach(b => {
-    if (fridgeEnd(b) <= now && !fridgeNotified.has(b.id)) {
-      fridgeNotified.add(b.id);
+    if (fridgeEnd(b) <= now && !fridgeNotified.has(b.id + ':' + b.fridgeAt)) {
+      fridgeNotified.add(b.id + ':' + b.fridgeAt);
       if (now - fridgeEnd(b) < 5000) { beep(); toast(`Frigo prêt : ${b.lab || 'Labo'}. Casse les plaquettes !`); if (S.view === 'labos') scheduleRender(); }
     }
   });
@@ -1797,29 +1895,44 @@ const A = {
     Store.write('sanctions/' + sx.id, d).then(ok => { if (ok) toast('Sanction annulée.'); }); render(); },
   ctab(t){ S.coffreTab = t.dataset.t; render(); },
   labtab(t){ S.labTab = t.dataset.t; render(); },
+  labsite(t){ S.labSite = t.dataset.id; S.labEdit = null; render(); },
+  labsub(t){ S.labSub = t.dataset.t; S.confirm = null; render(); },
   labstart(t){ t.disabled = true; labStart(); },
   labnext(t){ t.disabled = true; labNext(t.dataset.id); },
+  labfix(t){ t.disabled = true; labFix(t.dataset.id); },
+  labedit(t){ S.labEdit = t.dataset.id; render(); window.scrollTo({top:0, behavior:'smooth'}); },
+  labeditclose(){ S.labEdit = null; render(); },
   labdel(t){ const b = S.labs.find(x => x.id === t.dataset.id); S.confirm = null; if (!b || !isExec()) return;
     const d = Object.assign({}, b, {_del:true, lastById:me().id, lastAt:Date.now()}); S.labs = S.labs.filter(x => x !== b);
-    Store.write('labs/' + b.id, d).then(ok => { if (ok) toast('Cuve annulée (les ingrédients ne sont pas rendus au coffre).'); }); render(); },
+    Store.write('labs/' + b.id, d).then(ok => { if (ok) toast('Production supprimée (le coffre du labo n\'est pas modifié).'); }); render(); },
+  siteadd(){ if (!isExec()) return; const name = (($('#ns-name') || {}).value || '').trim().slice(0, 30); if (!name) { toast('Indique le nom du labo.'); return; }
+    const cap = Math.max(1, parseInt(($('#ns-cap') || {}).value, 10) || 1500); let id = slug(name); while (labSites().some(x => x.id === id)) id += '-2';
+    S.labSite = id; saveConfig({labSites: labSites().concat([{id, name, cap, type:'synthese'}])}); toast(`Labo ${name} ajouté.`); },
+  sitesave(){ const site = curSite(); if (!site || !isExec()) return; const name = (($('#st-name') || {}).value || '').trim().slice(0, 30) || site.name; const cap = Math.max(1, parseInt(($('#st-cap') || {}).value, 10) || site.cap || 1500);
+    saveConfig({labSites: labSites().map(x => x.id === site.id ? Object.assign({}, x, {name, cap}) : x)}); toast('Labo mis à jour.'); },
+  sitedel(){ const site = curSite(); S.confirm = null; if (!site || !isExec()) return; S.labSite = null; saveConfig({labSites: labSites().filter(x => x.id !== site.id)}); toast(`Labo ${site.name} retiré (son historique est gardé).`); },
+  recipesave(){ if (!isExec()) return; const r = recipe('fentanyl'); const num = (sel, d) => Math.max(0, parseInt(($(sel) || {}).value, 10) || d);
+    const o = {inputs: r.inputs.map((i, k) => ({qty: num('#rc-in-' + k, i.qty)})), plates: Math.max(1, num('#rc-plates', r.plates)), fridgeMin: Math.max(1, num('#rc-fridge', r.fridgeMin)), output: {qty: Math.max(1, num('#rc-out', r.output.qty))}};
+    saveConfig({recipes: Object.assign({}, cfg().recipes || {}, {fentanyl: o})}); toast('Recette enregistrée.'); },
+  recipereset(){ if (!isExec()) return; const rs = Object.assign({}, cfg().recipes || {}); delete rs.fentanyl; saveConfig({recipes: rs}); toast("Recette d'origine remise."); },
   invcat(t){ S.invCat = t.dataset.c2; render(); },
   invsel(t){ S.invSel = S.invSel === t.dataset.id ? null : t.dataset.id; S.confirm = null; render(); },
   mvq(t){ S.mvN = Number(t.dataset.n); const i = $('#mv-n'); if (i) i.value = S.mvN; },
   invmv(t){ const it = S.inv.find(x => x.id === S.invSel); const i = $('#mv-n'); const n = Math.max(1, parseInt(i ? i.value : S.mvN, 10) || 1); S.mvN = n; invMove(it, n * Number(t.dataset.d)); },
   invadd(){ if (!me()) return; const name = (($('#ia-name')||{}).value || '').trim().slice(0,40); if (!name) { toast("Indique le nom de l'objet."); return; }
     const qty = Math.max(1, parseInt(($('#ia-qty')||{}).value, 10) || 1); const w = Math.max(0, parseFloat(($('#ia-w')||{}).value) || 0); const cat = ($('#ia-cat')||{}).value || 'divers';
-    const ex = S.inv.find(x => x.name.toLowerCase() === name.toLowerCase());
+    const ex = invByName(name, S.invPlace);
     if (ex) { S.invSel = ex.id; invMove(ex, qty); return; }
-    let id = slug(name); while (S.inv.some(x => x.id === id)) id += '-2';
-    const d = invNewDoc(name, cat, qty, w); S.inv.push(Object.assign({}, d, {id})); S.invSel = id;
-    Store.write('inv/' + id, d).then(ok => { if (ok) { Store.write('invlog/' + uid('l'), {at:d.at, itemId:id, item:name, delta:qty, by:d.by, byId:d.byId}); toast(`Ajouté : ${fmtQty(qty)} ${name}.`); } }); render(); },
+    const id = newInvId(name); const d = invNewDoc(name, cat, qty, w, S.invPlace); const it = Object.assign({}, d, {id}); S.inv.push(it); S.invSel = id;
+    Store.write('inv/' + id, d).then(ok => { if (ok) { invLog(it, qty, d.at); toast(`Ajouté : ${fmtQty(qty)} ${name}.`); } }); render(); },
   invsave(){ const it = S.inv.find(x => x.id === S.invSel); if (!it || !isExec()) return;
     const d = Object.assign({}, it, {name:(($('#ie-name')||{}).value || it.name).trim().slice(0,40) || it.name, cat:($('#ie-cat')||{}).value || it.cat, icon:($('#ie-icon')||{}).value || '',
       w:Math.max(0, parseFloat(($('#ie-w')||{}).value) || 0), min:Math.max(0, parseInt(($('#ie-min')||{}).value, 10) || 0), qty:Math.max(0, parseInt(($('#ie-qty')||{}).value, 10) || 0), at:Date.now(), by:me().name, byId:me().id});
     const delta = d.qty - (it.qty || 0); Object.assign(it, d);
-    Store.write('inv/' + it.id, d).then(ok => { if (ok) { if (delta) Store.write('invlog/' + uid('l'), {at:d.at, itemId:it.id, item:d.name, delta, by:d.by, byId:d.byId}); toast('Objet mis à jour.'); } }); render(); },
+    Store.write('inv/' + it.id, d).then(ok => { if (ok) { if (delta) invLog(it, delta, d.at, 'correction'); toast('Objet mis à jour.'); } }); render(); },
   invdel(){ const it = S.inv.find(x => x.id === S.invSel); S.confirm = null; if (!it || !isExec()) return; S.inv = S.inv.filter(x => x !== it); S.invSel = null; Store.write('inv/' + it.id, null).then(ok => { if (ok) toast(`${it.name} retiré du coffre.`); }); render(); },
-  async invseed(){ if (!isExec() || S.inv.length) return; const list = INV_SEED.map(([name, cat, qty, w]) => ({path:'inv/' + slug(name), data:invNewDoc(name, cat, qty, w)}));
+  async invseed(){ if (!isExec() || invItems(S.invPlace).length || !S.invSeed) return; const place = S.invPlace; const used = new Set(S.inv.map(x => x.id));
+    const list = S.invSeed.map(([name, cat, qty, w]) => { let id = slug(name) + (place === 'villa' ? '' : '-' + place.slice(4)); while (used.has(id)) id += '-2'; used.add(id); return {path:'inv/' + id, data:invNewDoc(name, cat, qty, w, place)}; });
     if (await Store.batch(list)) toast('Contenu importé. Corrige les quantités si besoin.'); },
   askconfirm(t){ S.confirm = t.dataset.k; S.wiz ? renderWiz() : render(); },
   noconfirm(){ S.confirm = null; S.wiz ? renderWiz() : render(); },
@@ -1903,6 +2016,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.id === 'sx-reason') { e.preventDefault(); A.sanction(); }
   if (e.key === 'Enter' && e.target.id === 'ia-name') { e.preventDefault(); A.invadd(); }
 });
+document.addEventListener('toggle', e => { const d = e.target; if (d && d.dataset && d.dataset.edit) S.labEdit = d.open ? d.dataset.edit : (S.labEdit === d.dataset.edit ? null : S.labEdit); }, true);
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.c === 'invq') { S.invQ = t.value; const g = $('#inv-grid'); if (g) g.innerHTML = gridHtml(); return; }
@@ -1924,7 +2038,7 @@ document.addEventListener('change', e => {
     case 'crewlevel': saveConfig({crewLevel: Math.max(1, Math.min(99, parseInt(t.value,10) || 1))}); break;
     case 'ilabel': { const it = items(); it[Number(t.dataset.i)].label = t.value.trim().slice(0,40) || 'Objet'; saveConfig({coffreItems: it}); break; }
     case 'iqty': { const it = items(); it[Number(t.dataset.i)].qty = Math.max(1, parseInt(t.value,10) || 1); saveConfig({coffreItems: it}); break; }
-    case 'labn': S.labN = Math.max(1, Math.min(20, parseInt(t.value, 10) || 1)); S.labName = (($('#lab-name') || {}).value || S.labName); render(); break;
+    case 'labn': S.labN = Math.max(1, Math.min(20, parseInt(t.value, 10) || 1)); render(); break;
     case 'sxmember': S.sxMember = t.value; S.confirm = null; { const r = $('#sx-reason'); if (r) S.sxReason = r.value; } render(); break;
     case 'mgrade': { const m = S.mdocs.find(x => x.id === t.dataset.id); if (canEditMember(m) && gradeChoices().includes(t.value)) writeMember(m.id, {grade: t.value}); else render(); break; }
   }

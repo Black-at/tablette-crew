@@ -132,7 +132,7 @@ service cloud.firestore {
       match /crew/config {
         allow read: if okCode(c);
         allow create, update: if boot(c) || lvl(c) >= 3
-          || (lvl(c) == 2 && onlyKeys(['coffreExclude', 'coffreExcludeLast', '_p', '_k']));
+          || (lvl(c) == 2 && onlyKeys(['coffreExclude', 'coffreExcludeLast', 'labSites', 'recipes', '_p', '_k']));
         allow delete: if false;
       }
 
