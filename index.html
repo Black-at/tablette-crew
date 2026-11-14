@@ -457,11 +457,16 @@ const ART = {
   vault:'<rect x="8" y="9" width="48" height="45" rx="4"/><circle cx="32" cy="31" r="12"/><path d="M32 19v24M20 31h24M14 54v4M50 54v4"/>',
   flask:'<path d="M24 7h16M27 7v17L12 50a4 4 0 0 0 4 6h32a4 4 0 0 0 4-6L37 24V7M18 40h28"/>',
   oil:'<path d="M6 36h42v8H6zM12 44v15M42 44v15M27 36V9l13 27M27 9 15 36M48 36l9-21M4 59h56"/>',
-  bunker:'<path d="M6 52c0-16 12-28 26-28s26 12 26 28zM22 52V40a10 10 0 0 1 20 0v12M2 52h60M32 24v-8M26 16h12"/>'
+  bunker:'<path d="M6 52c0-16 12-28 26-28s26 12 26 28zM22 52V40a10 10 0 0 1 20 0v12M2 52h60M32 24v-8M26 16h12"/>',
+  flag:'<path d="M14 58V8M14 10h30l-6 9 6 9H14"/><path d="M6 58h20M40 40l14 14M54 40 40 54"/>',
+  labo:'<path d="M20 6h12M23 6v14L10 46a4 4 0 0 0 4 6h24a4 4 0 0 0 4-6L29 20V6M15 38h22"/><path d="M42 14l14 14M56 14 42 28"/>'
 };
 const art = k => `<svg class="art-ic" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ART[k]}</svg>`;
 
 const MISSIONS = [
+  // Opérations du crew (hors tablette) : pas d'XP, de niveau ni de temps de recharge ; gain facultatif.
+  {id:'territoire', name:'Attaque de territoire', min:4, max:23, dur:30, lvl:0, hue:0,   art:'flag', crew:true, emoji:'🏴'},
+  {id:'labo-atk',   name:'Attaque de laboratoire', min:4, max:15, dur:30, lvl:0, hue:270, art:'labo', crew:true, emoji:'🧪'},
   {id:'gruppe6',  name:'Gruppe6',               min:2, max:7,  xp:2500,  dur:30, lvl:1,  cd:24,  hue:140, art:'truck'},
   {id:'bateau',   name:'Bateau de trafiquant',  min:4, max:7,  xp:1500,  dur:30, lvl:3,  cd:48,  hue:205, art:'ship'},
   {id:'flecca',   name:'Flecca Banque',         min:4, max:10, xp:3500,  dur:30, lvl:5,  cd:48,  hue:150, art:'bank'},
@@ -717,7 +722,7 @@ function missionCard(m){
   const locked = m.lvl > (Number(cfg().crewLevel)||1);
   const last = lastOpOf(m.id);
   const left = last ? (last.endedAt + m.cd*3600e3) - Date.now() : 0;
-  let sub = 'Disponible en permanence', subCls = '';
+  let sub = m.crew ? 'Opération du crew' : 'Disponible en permanence', subCls = '';
   if (locked) sub = `Débloquée au niveau ${m.lvl}`;
   else if (left > 0) { const h = Math.ceil(left/3600e3); sub = `En recharge · encore ${h} h`; subCls = 'cool'; }
   let btn;
@@ -725,14 +730,14 @@ function missionCard(m){
   else if (!isLead()) btn = `<button class="btn lock-b" disabled title="Seuls les Exécutants et plus lancent une OP">Réservé aux Exécutants</button>`;
   else btn = `<button class="btn pri" data-a="start" data-m="${m.id}">Commencer</button>`;
   return `<article class="mcard ${locked?'locked':''}" style="--h:${m.hue}">
-    <div class="mart"><span class="ghost-t">${esc(m.name)}</span>${art(m.art)}<span class="cd">${ic('clock')}${m.cd}h</span></div>
+    <div class="mart"><span class="ghost-t">${esc(m.name)}</span>${art(m.art)}${m.cd ? `<span class="cd">${ic('clock')}${m.cd}h</span>` : '<span class="cd">Crew</span>'}</div>
     <div class="mbody">
       <div class="mname"><h3 title="${esc(m.name)}">${esc(m.name)}</h3><p class="${subCls}">${sub}</p></div>
       <div class="mstats">
         <div class="st">${ic('users')}<b>${m.min}-${m.max}</b><small>JOUEURS</small></div>
-        <div class="st">${ic('zap')}<b>+${m.xp} XP</b><small>GAIN</small></div>
+        <div class="st">${ic('zap')}<b>${m.xp ? `+${m.xp} XP` : '—'}</b><small>GAIN</small></div>
         <div class="st">${ic('timer')}<b>${m.dur}m</b><small>DURÉE</small></div>
-        <div class="st">${ic('star')}<b>${m.lvl}</b><small>NIVEAU</small></div>
+        <div class="st">${ic('star')}<b>${m.lvl || '—'}</b><small>NIVEAU</small></div>
       </div>
       <div class="mact">${btn}</div>
     </div>
@@ -822,9 +827,10 @@ function opFromWiz(w){
 }
 function discordText(op){
   const ok = op.result !== 'fail';
-  const L = [`# ${ok ? '💵' : '❌'} ${op.missionName}${ok ? '' : ' (échouée)'}`, '',
-    `Détail : ${op.participants.map(p => p.name).join(', ') || '—'}`,
-    `Total gagné = ${money(op.total)} $`];
+  const mi = MBY[op.missionId] || {};
+  const L = [`# ${ok ? (mi.emoji || '💵') : '❌'} ${op.missionName}${ok ? '' : ' (échouée)'}`, '',
+    `Détail : ${op.participants.map(p => p.name).join(', ') || '—'}`];
+  if (!(mi.crew && !op.total)) L.push(`Total gagné = ${money(op.total)} $`);
   if (op.withPostes) {
     const rows = POSTES.map(p => { const n = op.participants.filter(x => x.poste === p.id).map(x => x.name); return n.length ? `${p.emoji} ${p.name} : ${n.join(', ')}` : null; }).filter(Boolean);
     if (rows.length) L.push('', 'Postes :', ...rows);
@@ -924,7 +930,7 @@ function stepBilan(w, m){
       <div class="stack">
         <div class="field">Résultat de l'OP
           <div class="seg" role="group" aria-label="Résultat"><button data-a="wresult" data-r="ok" aria-pressed="${w.result!=='fail'}">Réussie</button><button data-a="wresult" data-r="fail" aria-pressed="${w.result==='fail'}">Échouée</button></div></div>
-        ${w.result !== 'fail' ? `<label class="field" for="total">Total gagné ($)
+        ${w.result !== 'fail' ? `<label class="field" for="total">Total gagné ($)${m.crew ? ' — facultatif' : ''}
           <input class="inp money" id="total" data-c="total" inputmode="numeric" autocomplete="off" placeholder="1.733.650" value="${esc(w.total ? money(parseMoney(w.total)) : '')}"></label>
         <div class="kpi"><small>Part par personne</small><b id="share">${money(share)} $</b><span>Total divisé par ${n} participant${n>1?'s':''} — indicatif, en attendant les paies.</span></div>` : ''}
         <label class="check"><input type="checkbox" id="withp" data-c="withp" ${w.withPostes?'checked':''}>Ajouter les postes dans le message</label>
@@ -1657,7 +1663,7 @@ const A = {
   copywiz(){ const txt = discordText(opFromWiz(S.wiz)); copy(txt, $('#disc')); },
   wsave(){
     const w = S.wiz; const total = parseMoney(w.total);
-    if (w.result !== 'fail' && !total) { toast('Indique le total gagné avant d\'enregistrer.'); const i = $('#total'); if (i) i.focus(); return; }
+    if (w.result !== 'fail' && !total && !(MBY[w.missionId] || {}).crew) { toast('Indique le total gagné avant d\'enregistrer.'); const i = $('#total'); if (i) i.focus(); return; }
     const op = Object.assign(opFromWiz(w), {startedAt:w.startedAt, endedAt:Date.now(), by:w.by, vehicles:w.vehicles.map(v => ({seats:v.seats, slots:v.slots}))});
     clearTimeout(wizSaveT);
     S.ops.push(Object.assign({}, op, {id:w.id}));
