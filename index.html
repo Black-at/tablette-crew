@@ -1425,6 +1425,7 @@ Store.init();
   const cle = (hash.match(/^#cle=([A-Za-z0-9-]+)$/) || [])[1];
   const legacy = (hash.match(/^#code=([A-Za-z0-9_-]{16,64})$/) || [])[1];
   if (cle || legacy) { try { history.replaceState(null, '', location.pathname + location.search); } catch(e) {} }
+  if (legacy) LS.set('crew-code', legacy); // ancien lien d'invitation : retenu pour la migration
   if (Store.mode !== 'fire') { S.meId = null; connect(); return; }
   const saved = LS.get('crew-key', null);
   const key = cle ? cle.toUpperCase() : saved;
