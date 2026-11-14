@@ -1108,7 +1108,9 @@ VIEWS.parametres = () => {
       <div class="panel"><h3>Mon profil</h3><p class="hint">Ton nom sert pour lancer les OP, prendre les formations et cocher le coffre.</p>
         <div class="row"><b>${me() ? esc(me().name) : 'Aucun profil choisi'}</b>${me() ? `<span class="grade" style="--gc:${GCOL[me().grade]}">${esc(me().grade)}</span>` : ''}<span class="spacer"></span><button class="btn sm" data-a="profile">Changer</button></div></div>
       ${Store.mode === 'fire' ? `<div class="panel"><h3>Code du crew</h3><p class="hint">Partage-le uniquement sur le Discord du crew : il donne accès à toutes les données.</p>
-        <div class="row"><code class="num" style="font-size:13px;color:#c9ccd2">${esc((Store.code||'').slice(0,4))}••••••••••••</code><span class="spacer"></span><button class="btn sm" data-a="codecopy">${ic('copy')}Copier</button><button class="btn sm" data-a="codeopen">Changer</button></div></div>` : ''}
+        <div class="row"><code class="num" style="font-size:13px;color:#c9ccd2">${esc((Store.code||'').slice(0,4))}••••••••••••</code><span class="spacer"></span><button class="btn sm" data-a="codecopy">${ic('copy')}Copier</button><button class="btn sm" data-a="codeopen">Changer</button></div>
+        <button class="btn pri" data-a="invitecopy" style="margin-top:12px;width:100%">${ic('copy')}Copier le lien d'invitation</button>
+        <p class="hint" style="margin:8px 0 0">Le lien contient déjà le code : les membres cliquent dessus et arrivent directement dans le crew.</p></div>` : ''}
       <div class="panel"><h3>Droits</h3><p class="hint" style="margin:0">Lieutenant et plus : lancer les OP, tirer la roue, valider les formations.<br>Patron, Co-Patron et Exécutant : gérer les membres, supprimer un bilan, modifier ces paramètres.</p></div>
       <div class="panel"><h3>Bientôt</h3><p class="hint" style="margin:0">Paies et laboratoires arrivent dans une prochaine version.</p></div>
     </div></div>`;
@@ -1277,7 +1279,7 @@ function renderCode(state){
     : state === 'wait' ? `<p>Vérification…</p>` : '';
   root.innerHTML = `<div class="ov" role="dialog" aria-modal="true" aria-label="Code du crew"><div class="idm">
     <div class="row"><h3>Code du crew</h3><span class="spacer"></span>${Store.code ? `<button class="btn sm" data-a="codeclose">${ic('x')}Fermer</button>` : ''}</div>
-    <p>Entre le code que le patron a partagé sur le Discord du crew. Il est retenu sur cet appareil.</p>
+    <p>Entre le code que le patron a partagé sur le Discord du crew, ou ouvre directement son lien d'invitation. Il est retenu sur cet appareil.</p>
     <div class="row"><input class="inp" id="code-in" autocomplete="off" spellcheck="false" placeholder="Code du crew" style="flex:1;min-width:200px" value="${esc(S.codeTry||'')}"><button class="btn pri" data-a="codego">Entrer</button></div>
     ${msg}
   </div></div>`;
@@ -1305,11 +1307,26 @@ A.codeclose = () => { S.codeOpen = false; renderCode(); };
 A.codecopy = () => copy(Store.code || '', null);
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'code-in') { e.preventDefault(); A.codego(); } });
 
+A.invitecopy = () => copy(location.origin + location.pathname + '#code=' + (Store.code || ''), null);
+
 Store.init();
+const inviteM = location.hash.match(/^#code=([A-Za-z0-9_-]{16,64})$/);
+if (inviteM) { try { history.replaceState(null, '', location.pathname + location.search); } catch(e) {} }
 if (Store.mode === 'fire') {
-  Store.code = LS.get('crew-code', null);
-  if (Store.code && CODE_RE.test(Store.code)) connect();
-  else { Store.code = null; S.codeOpen = true; renderSync(); renderCode(); }
+  const saved = LS.get('crew-code', null);
+  if (inviteM && inviteM[1] !== saved) {
+    // Lien d'invitation : on vérifie le code puis on connecte directement.
+    S.codeOpen = true; S.codeTry = inviteM[1]; renderSync(); renderCode('wait');
+    Store.code = inviteM[1];
+    Store.exists('crew/config').then(ok => {
+      if (ok) { LS.set('crew-code', inviteM[1]); S.codeOpen = false; S.codeTry = ''; renderCode(); connect(); toast('Bienvenue dans le crew.'); }
+      else { Store.code = saved && CODE_RE.test(saved) ? saved : null; renderCode('notfound'); }
+    }, () => { Store.code = null; renderCode('err'); });
+  } else {
+    Store.code = saved;
+    if (Store.code && CODE_RE.test(Store.code)) connect();
+    else { Store.code = null; S.codeOpen = true; renderSync(); renderCode(); }
+  }
 } else connect();
 })();
 </script>
