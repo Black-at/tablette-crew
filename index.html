@@ -365,6 +365,29 @@ details.edit summary{cursor:pointer;font-size:12.5px;color:var(--accent-hi)}
 .dots{display:inline-flex;gap:5px}
 .dots i{width:12px;height:12px;border-radius:50%;border:1px solid rgba(229,72,77,.6)}
 .dots i.on{background:var(--danger)}
+
+/* Laboratoires */
+.batch{background:var(--card);border:1px solid var(--line-2);border-left:3px solid var(--p-neg);border-radius:5px;padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.batch.frigo{border-left-color:var(--accent)}
+.batch h4{margin:0;font-size:14.5px;font-weight:700;text-transform:uppercase}
+.batch .meta{font-size:12px;color:var(--muted)}
+.batch p{margin:0;font-size:13px;color:#c9ccd2}
+.batch .fi{display:grid;place-items:center;width:34px;height:34px;border-radius:5px;background:color-mix(in srgb,var(--pc) 18%,transparent);color:var(--pc);flex:none}
+.lsteps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.lsteps li{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:4px;background:var(--panel);border:1px solid var(--line);font-size:12px;color:var(--muted)}
+.lsteps li b{display:grid;place-items:center;width:20px;height:20px;border-radius:3px;background:#24252a;font-size:11px;flex:none}
+.lsteps li b .ic{width:12px;height:12px}
+.lsteps li.cur{color:var(--fg);border-color:var(--accent-line)}
+.lsteps li.cur b{background:var(--accent);color:#fff}
+.lsteps li.done b{background:var(--ok-soft);color:#7ee08b}
+.fridge{display:grid;grid-template-columns:1fr auto;align-items:center;gap:6px 12px;padding:12px 14px;border-radius:5px;background:linear-gradient(90deg,rgba(30,144,232,.14),rgba(30,144,232,.03));border:1px solid rgba(30,144,232,.3)}
+.fridge .lbl{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-hi)}
+.fridge b{font-size:26px;font-weight:700}
+.fridge .fbar{grid-column:1/-1;height:5px;border-radius:3px;background:#24252a;overflow:hidden}
+.fridge .fbar i{display:block;height:100%;background:var(--accent)}
+.fridge.ready{background:var(--ok-soft);border-color:rgba(63,185,80,.4)}
+.fridge.ready .lbl,.fridge.ready b{color:#7ee08b}
+.fridge.ready .fbar i{background:var(--ok)}
 @media (max-width:900px){
   .app{grid-template-columns:minmax(0,1fr)}
   .side{min-width:0;position:relative;top:0;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:18px 16px;gap:14px}
@@ -525,13 +548,13 @@ const NAV = [
   {id:'missions', label:'Missions', icon:'swords', title:'Missions', sub:'Lancez des braquages et opérations pour faire progresser votre crew.'},
   {id:'bilans', label:"Bilan d'activité", icon:'scroll', title:"Bilan d'activité", sub:'Historique des OP, gains et participation de chaque membre.'},
   {id:'coffre', label:'Coffre', icon:'box', title:'Coffre', sub:'Ce qu\'il y a dans le coffre de la villa, et qui le remplit cette semaine.'},
+  {id:'labos', label:'Laboratoires', icon:'flask', title:'Laboratoires', sub:'Synthèse : cuve, réfrigérateur, pochons. Les cultures arrivent bientôt.'},
   {id:'formations', label:'Formations', icon:'grad', title:'Formations', sub:'Négociateur, surveillance des otages, braquage : prends ta formation.'},
   {id:'membres', label:'Membres', icon:'users', title:'Membres', sub:'La hiérarchie du crew et le parcours de chaque membre.'},
   {id:'sanctions', label:'Sanctions', icon:'alert', title:'Sanctions', sub:"Rappels à l'ordre et avertissements. 2 avertissements = viré."},
   {id:'parametres', label:'Paramètres', icon:'gear', title:'Paramètres', sub:'Nom et niveau du crew, contenu du coffre, profil.'},
   {id:'comptes', label:"Codes d'accès", icon:'lock', title:"Codes d'accès", sub:'Le mot de passe de départ de chaque membre. Toi seul les vois.', admin:true},
   {id:'paies', label:'Paies', icon:'wallet', soon:true},
-  {id:'labos', label:'Laboratoires', icon:'flask', soon:true}
 ];
 
 /* ---------- Helpers ---------- */
@@ -647,7 +670,7 @@ const S = {
   view: 'missions', meId: LS.get('crew-me', null),
   config: null, cfgLoaded:false, ops: [], live: [], coffre: [], forms: [],
   wiz: null, sel: null, confirm: null, period: 'week', spinning: false, pending: false,
-  wheelRot: 0, idOpen: false, syncErr:false, slow:false, mdocs: [], vault: {}, reveal: {}, loginOpen: false, secOpen: false, myKey: null, sanctions: [], sxType: 'avert', sxMember: '', sxReason: '', inv: [], invlog: [], invCat: 'all', invQ: '', invSel: null, mvN: 1, coffreTab: 'inv', vaultOn: false
+  wheelRot: 0, idOpen: false, syncErr:false, slow:false, mdocs: [], vault: {}, reveal: {}, loginOpen: false, secOpen: false, myKey: null, labs: [], labTab: 'synthese', labN: 1, labName: '', sanctions: [], sxType: 'avert', sxMember: '', sxReason: '', inv: [], invlog: [], invCat: 'all', invQ: '', invSel: null, mvN: 1, coffreTab: 'inv', vaultOn: false
 };
 const cfg = () => Object.assign({crewName:'Crew', crewLevel:1, members:[], coffreItems:DEFAULT_ITEMS, coffreExclude:[], coffreExcludeLast:true}, S.config || {});
 const members = () => S.mdocs.filter(m => !m.removed);
@@ -822,7 +845,7 @@ function autoVehicles(w){
   if (added) toast(`${added} véhicule${added>1?'s':''} ajouté${added>1?'s':''} pour placer tout le monde.`);
 }
 function opFromWiz(w){
-  return {missionId:w.missionId, missionName:w.missionName, result:w.result, total: w.result==='fail' ? 0 : parseMoney(w.total),
+  return {missionId:w.missionId, missionName:w.missionName, result:w.result, total: w.result==='fail' || (MBY[w.missionId] || {}).crew ? 0 : parseMoney(w.total),
     participants: w.participants.map(n => ({name:n, poste: w.postes[n] || null})), withPostes: w.withPostes};
 }
 function discordText(op){
@@ -830,7 +853,7 @@ function discordText(op){
   const mi = MBY[op.missionId] || {};
   const L = [`# ${ok ? (mi.emoji || '💵') : '❌'} ${op.missionName}${ok ? '' : ' (échouée)'}`, '',
     `Détail : ${op.participants.map(p => p.name).join(', ') || '—'}`];
-  if (!(mi.crew && !op.total)) L.push(`Total gagné = ${money(op.total)} $`);
+  if (!mi.crew) L.push(`Total gagné = ${money(op.total)} $`);
   if (op.withPostes) {
     const rows = POSTES.map(p => { const n = op.participants.filter(x => x.poste === p.id).map(x => x.name); return n.length ? `${p.emoji} ${p.name} : ${n.join(', ')}` : null; }).filter(Boolean);
     if (rows.length) L.push('', 'Postes :', ...rows);
@@ -930,7 +953,8 @@ function stepBilan(w, m){
       <div class="stack">
         <div class="field">Résultat de l'OP
           <div class="seg" role="group" aria-label="Résultat"><button data-a="wresult" data-r="ok" aria-pressed="${w.result!=='fail'}">Réussie</button><button data-a="wresult" data-r="fail" aria-pressed="${w.result==='fail'}">Échouée</button></div></div>
-        ${w.result !== 'fail' ? `<label class="field" for="total">Total gagné ($)${m.crew ? ' — facultatif' : ''}
+        ${m.crew ? `<p class="hint" style="margin:0">Pas d'argent à déclarer pour cette mission : enregistre directement le bilan.</p>` : ''}
+        ${w.result !== 'fail' && !m.crew ? `<label class="field" for="total">Total gagné ($)
           <input class="inp money" id="total" data-c="total" inputmode="numeric" autocomplete="off" placeholder="1.733.650" value="${esc(w.total ? money(parseMoney(w.total)) : '')}"></label>
         <div class="kpi"><small>Part par personne</small><b id="share">${money(share)} $</b><span>Total divisé par ${n} participant${n>1?'s':''} — indicatif, en attendant les paies.</span></div>` : ''}
         <label class="check"><input type="checkbox" id="withp" data-c="withp" ${w.withPostes?'checked':''}>Ajouter les postes dans le message</label>
@@ -973,9 +997,9 @@ function opCard(o){
   const parts = (o.participants||[]).map(p => `<span class="pc" style="--pc:${p.poste?PBY[p.poste].col:'var(--dim)'}">${esc(p.name)}</span>`).join('');
   const k = 'del:' + o.id;
   return `<article class="opc ${fail?'fail':''}" style="--h:${m.hue}"><span class="bar"></span><div class="in">
-    <div class="op-h"><h4>${esc(o.missionName)}</h4><span class="st-pill ${fail?'fail':'ok'}">${fail?'Échouée':'Réussie'}</span><span class="meta">${fmtDT(o.endedAt)} · lancée par ${esc(o.by||'?')}</span><span class="tot">${money(o.total)} $</span></div>
+    <div class="op-h"><h4>${esc(o.missionName)}</h4><span class="st-pill ${fail?'fail':'ok'}">${fail?'Échouée':'Réussie'}</span><span class="meta">${fmtDT(o.endedAt)} · lancée par ${esc(o.by||'?')}</span>${(MBY[o.missionId] || {}).crew ? '' : `<span class="tot">${money(o.total)} $</span>`}</div>
     <div class="chips">${parts}</div>
-    <div class="row"><span class="meta" style="font-size:11.5px;color:var(--muted)">${(o.participants||[]).length} participants${!fail && o.participants && o.participants.length ? ` · ${money(Math.floor(o.total/o.participants.length))} $ par tête` : ''}</span><span class="spacer"></span>
+    <div class="row"><span class="meta" style="font-size:11.5px;color:var(--muted)">${(o.participants||[]).length} participants${!fail && o.total && o.participants && o.participants.length ? ` · ${money(Math.floor(o.total/o.participants.length))} $ par tête` : ''}</span><span class="spacer"></span>
       <button class="btn sm" data-a="copyop" data-id="${esc(o.id)}">${ic('copy')}Copier pour Discord</button>
       ${canManage() ? (S.confirm === k ? `<button class="btn red sm" data-a="delop" data-id="${esc(o.id)}">Confirmer la suppression</button><button class="btn sm" data-a="noconfirm">Garder</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}" aria-label="Supprimer ce bilan">${ic('trash')}</button>`) : ''}
     </div></div></article>`;
@@ -1598,6 +1622,162 @@ const INV_SEED = [
   ['Cisaille','divers',2,3],['JerryCan','divers',1,2],['GHB','divers',1,0.5]
 ];
 
+/* ---------- Laboratoires ---------- */
+// Recette de synthèse. Pour ajouter une drogue plus tard : une nouvelle entrée ici.
+const RECIPES = {
+  fentanyl: {id:'fentanyl', name:'Fentanyl', type:'synthese',
+    inputs:[{name:'Acide', qty:10}, {name:'Catalyseur', qty:10}, {name:'Base opioïde', qty:10}, {name:'Solvant', qty:20}],
+    plates:10, fridgeMin:16, output:{name:'Pochon de fentanyl', qty:20}}
+};
+const normName = x => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/s$/, '').trim();
+const invByName = name => S.inv.find(x => normName(x.name) === normName(name));
+const possibleBatches = r => Math.min(...r.inputs.map(i => { const it = invByName(i.name); return it ? Math.floor((it.qty || 0) / i.qty) : 0; }));
+const mmss = ms => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+const fridgeEnd = b => (b.fridgeAt || 0) + RECIPES[b.recipe].fridgeMin * 60000;
+const LAB_STEPS = [{id:'cuve', label:'Cuve'}, {id:'frigo', label:'Réfrigérateur'}, {id:'fini', label:'Pochons'}];
+
+// Mouvement silencieux dans l'inventaire du coffre (crée l'objet s'il n'existe pas).
+async function invAdjust(name, delta, cat, icon, note){
+  if (!me() || !delta) return false;
+  const by = me().name, byId = me().id, at = Date.now();
+  let it = invByName(name);
+  if (!it) {
+    if (delta < 0) return false;
+    let id = slug(name); while (S.inv.some(x => x.id === id)) id += '-2';
+    const d = Object.assign(invNewDoc(name, cat || 'divers', delta, 0), {icon: icon || ''});
+    S.inv.push(Object.assign({}, d, {id}));
+    const ok = await Store.write('inv/' + id, d);
+    if (ok) Store.write('invlog/' + uid('l'), {at, itemId:id, item:name + (note ? ` (${note})` : ''), delta, by, byId});
+    return ok;
+  }
+  if ((it.qty || 0) + delta < 0) return false;
+  it.qty = (it.qty || 0) + delta;
+  const ok = await Store.incr('inv/' + it.id, delta, {at, by, byId});
+  if (ok) Store.write('invlog/' + uid('l'), {at, itemId:it.id, item:it.name + (note ? ` (${note})` : ''), delta, by, byId});
+  return ok;
+}
+function labStepper(b){
+  const idx = {cuve:0, frigo:1, fini:2}[b.status];
+  return `<ol class="lsteps">${LAB_STEPS.map((st, i) => `<li class="${i < idx || b.status === 'fini' ? 'done' : i === idx ? 'cur' : ''}"><b>${i < idx || b.status === 'fini' ? ic('check') : i + 1}</b>${st.label}</li>`).join('')}</ol>`;
+}
+function batchCard(b){
+  const r = RECIPES[b.recipe]; if (!r) return '';
+  const k = 'labdel:' + b.id; const now = Date.now();
+  let body = '', act = '';
+  if (b.status === 'cuve') {
+    body = `<p>Les ingrédients sont dans la cuve. Extrais les <b>${r.plates} plaquettes</b> et mets-les au réfrigérateur.</p>`;
+    act = `<button class="btn pri" data-a="labnext" data-id="${esc(b.id)}">${ic('right')}Extraire et mettre au frigo</button>`;
+  } else if (b.status === 'frigo') {
+    const left = fridgeEnd(b) - now; const ready = left <= 0;
+    body = `<div class="fridge ${ready ? 'ready' : ''}"><span class="lbl">${ready ? 'Plaquettes prêtes' : 'Au réfrigérateur'}</span><b class="num" data-until="${fridgeEnd(b)}">${ready ? 'Prêt' : mmss(left)}</b>
+      <span class="fbar"><i data-bar="${fridgeEnd(b)}" data-len="${r.fridgeMin * 60000}" style="width:${Math.min(100, 100 - left / (r.fridgeMin * 600))}%"></i></span></div>
+      <p>Ensuite : casser les ${r.plates} plaquettes et les mettre en <b>${r.output.qty} pochons</b>.</p>`;
+    act = ready || S.confirm === 'early:' + b.id
+      ? `<label class="check"><input type="checkbox" id="tocoffre-${esc(b.id)}" checked>Ranger les ${r.output.qty} pochons dans le coffre</label><button class="btn ${ready ? 'ok' : 'red'}" data-a="labnext" data-id="${esc(b.id)}">${ic('check')}${ready ? 'Casser et mettre en pochons' : 'Confirmer : sortir avant la fin'}</button>`
+      : `<button class="btn" disabled>Casser et mettre en pochons</button><button class="btn ghost sm" data-a="askconfirm" data-k="early:${esc(b.id)}">Déjà fini en jeu ?</button>`;
+  }
+  const who = (b.log || []).map(l => `${esc(l.by)} (${{cuve:'cuve', frigo:'frigo', fini:'pochons'}[l.step]})`).join(' · ');
+  return `<article class="batch ${b.status}">
+    <div class="row"><span class="fi" style="--pc:var(--p-neg)">${ic('flask')}</span><div style="min-width:0"><h4>${esc(r.name)} · ${esc(b.lab || 'Labo')}</h4><span class="meta">Lancée par ${esc(b.by)} · ${ago(b.startedAt)}</span></div><span class="spacer"></span>
+      ${isExec() ? (S.confirm === k ? `<button class="btn red sm" data-a="labdel" data-id="${esc(b.id)}">Annuler la cuve</button><button class="btn sm" data-a="noconfirm">Non</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}" aria-label="Annuler cette cuve">${ic('x')}</button>`) : ''}</div>
+    ${labStepper(b)}${body}
+    <div class="row">${act}</div>
+    ${who ? `<p class="hint" style="margin:0;font-size:11.5px">${who}</p>` : ''}
+  </article>`;
+}
+VIEWS.labos = () => {
+  const r = RECIPES.fentanyl;
+  const tab = S.labTab || 'synthese';
+  const head = `<div class="row" style="margin-bottom:14px"><div class="seg" role="group" aria-label="Type de laboratoire">
+      <button data-a="labtab" data-t="synthese" aria-pressed="${tab==='synthese'}">Synthèse</button><button data-a="labtab" data-t="culture" aria-pressed="${tab==='culture'}">Culture</button></div></div>`;
+  if (tab === 'culture') return head + `<div class="empty"><strong>Laboratoires de culture</strong>Bientôt : explique-moi comment marchent vos cultures et je les ajoute ici.</div>`;
+  const active = S.labs.filter(b => b.status !== 'fini').sort((a, b) => a.startedAt - b.startedAt);
+  const done = S.labs.filter(b => b.status === 'fini').sort((a, b) => b.doneAt - a.doneAt);
+  const wk = isoWeek(new Date()).id;
+  const weekDone = done.filter(b => isoWeek(new Date(b.doneAt)).id === wk);
+  const nextOut = active.filter(b => b.status === 'frigo').map(fridgeEnd).sort((a, b) => a - b)[0];
+  const n = Math.max(1, Math.min(20, S.labN || 1));
+  const can = possibleBatches(r);
+  const workers = {}; S.labs.forEach(b => (b.log || []).forEach(l => { if (isoWeek(new Date(l.at)).id === wk) workers[l.by] = (workers[l.by] || 0) + 1; }));
+  const lb = Object.entries(workers).sort((a, b) => b[1] - a[1]); const mx = lb.length ? lb[0][1] : 1;
+  const labNames = [...new Set(S.labs.map(b => b.lab).filter(Boolean))];
+  const rows = r.inputs.map(i => { const it = invByName(i.name); const have = it ? it.qty || 0 : 0; const need = i.qty * n;
+    return `<tr><td>${esc(i.name)}</td><td class="num">${fmtQty(need)}</td><td class="num" style="color:${have >= need ? '#7ee08b' : '#ff8a8d'}">${it ? fmtQty(have) : 'absent'}</td></tr>`; }).join('');
+  const enough = can >= n;
+  return head + `<div class="kpis">
+      <div class="kpi"><small>Cuves en cours</small><b>${active.length}</b><span>${active.filter(b => b.status === 'frigo').length} au frigo</span></div>
+      <div class="kpi"><small>Prochaine sortie de frigo</small><b class="num" ${nextOut ? `data-until="${nextOut}"` : ''}>${nextOut ? (nextOut <= Date.now() ? 'Prêt' : mmss(nextOut - Date.now())) : '—'}</b><span>${nextOut ? 'minutes restantes' : 'rien au frigo'}</span></div>
+      <div class="kpi"><small>Pochons cette semaine</small><b>${fmtQty(weekDone.length * r.output.qty)}</b><span>${weekDone.length} cuve${weekDone.length > 1 ? 's' : ''} terminée${weekDone.length > 1 ? 's' : ''}</span></div>
+      <div class="kpi"><small>Possible avec le coffre</small><b>${can}</b><span>cuve${can > 1 ? 's' : ''} de ${r.name.toLowerCase()}</span></div>
+    </div>
+    <div class="cols"><div class="stack">
+      ${active.length ? active.map(batchCard).join('') : `<div class="empty"><strong>Aucune cuve en cours</strong>Lance une cuve avec le panneau « Nouvelle cuve ».</div>`}
+      <div class="panel"><h3>Historique</h3>${done.length ? `<div class="hist">${done.slice(0, 15).map(b => `<div class="hist-r"><span><b>${fmtQty(r.output.qty)} pochons</b> · ${esc(b.lab || 'Labo')}<br><small>${fmtDT(b.doneAt)} · ${(b.log || []).map(l => esc(l.by)).filter((v, i, a) => a.indexOf(v) === i).join(', ')}</small></span><span class="st-pill ${b.toCoffre ? 'ok' : 'wait'}">${b.toCoffre ? 'Rangé au coffre' : 'Pas au coffre'}</span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Les cuves terminées apparaîtront ici.</p>'}</div>
+    </div>
+    <div class="stack">
+      <div class="panel"><h3>Nouvelle cuve · ${r.name}</h3><p class="hint">1 cuve = ${r.inputs.map(i => `${i.qty} ${i.name.toLowerCase()}`).join(', ')} → ${r.plates} plaquettes → ${r.fridgeMin} min au frigo → ${r.output.qty} pochons.</p>
+        <div class="row" style="align-items:flex-end">
+          <label class="field" for="lab-n">Nombre de cuves<input class="inp num" id="lab-n" data-c="labn" type="number" min="1" max="20" value="${n}" style="width:90px"></label>
+          <label class="field" for="lab-name" style="flex:1;min-width:140px">Labo<input class="inp" id="lab-name" list="lab-names" maxlength="30" value="${esc(S.labName || labNames[0] || 'Labo de synthèse')}"><datalist id="lab-names">${labNames.map(x => `<option value="${esc(x)}">`).join('')}</datalist></label>
+        </div>
+        <div class="tbl-wrap" style="margin-top:12px"><table><thead><tr><th>Ingrédient</th><th>Il faut</th><th>Au coffre</th></tr></thead><tbody>${rows}
+          <tr><td><b>Résultat</b></td><td class="num" colspan="2"><b>${fmtQty(r.plates * n)} plaquettes → ${fmtQty(r.output.qty * n)} pochons</b></td></tr></tbody></table></div>
+        <label class="check" style="margin-top:12px"><input type="checkbox" id="lab-fromcoffre" ${enough ? 'checked' : 'disabled'}>Prendre les ingrédients dans le coffre${enough ? '' : ' (pas assez au coffre)'}</label>
+        <div class="row" style="margin-top:12px"><button class="btn pri" data-a="labstart" ${me() ? '' : 'disabled'}>${ic('flask')}Lancer ${n > 1 ? `${n} cuves` : 'la cuve'}</button></div>
+      </div>
+      <div class="panel"><h3>Qui a travaillé cette semaine</h3>${lb.length ? `<div class="lb">${lb.map(([nm, c], i) => `<div class="lb-r"><span class="rk">${i + 1}</span><span class="nm"><span>${esc(nm)}</span><span class="track"><i style="width:${Math.max(4, c / mx * 100)}%"></i></span></span><span class="v">${c} étape${c > 1 ? 's' : ''}</span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Chaque étape (cuve, frigo, pochons) compte pour celui qui la fait.</p>'}</div>
+    </div></div>`;
+};
+async function labStart(){
+  if (!me()) return;
+  const r = RECIPES.fentanyl;
+  const n = Math.max(1, Math.min(20, parseInt(($('#lab-n') || {}).value, 10) || 1));
+  const lab = (($('#lab-name') || {}).value || '').trim().slice(0, 30) || 'Labo de synthèse'; S.labName = lab;
+  const fromCoffre = !!(($('#lab-fromcoffre') || {}).checked);
+  if (fromCoffre && possibleBatches(r) < n) { toast("Pas assez d'ingrédients au coffre."); return; }
+  const at = Date.now(), by = me().name, byId = me().id;
+  if (fromCoffre) for (const i of r.inputs) await invAdjust(i.name, -i.qty * n, 'divers', 'drug', `labo ${lab}`);
+  for (let k = 0; k < n; k++) {
+    const id = uid('lab');
+    const d = {recipe:r.id, lab, status:'cuve', startedAt:at + k, by, byId, fromCoffre, log:[{step:'cuve', at, by, byId}], lastById:byId, lastAt:at};
+    S.labs.push(Object.assign({}, d, {id})); await Store.write('labs/' + id, d);
+  }
+  toast(n > 1 ? `${n} cuves lancées.` : 'Cuve lancée.'); render();
+}
+async function labNext(id){
+  const b = S.labs.find(x => x.id === id); if (!b || !me()) return;
+  const r = RECIPES[b.recipe]; const at = Date.now(), by = me().name, byId = me().id;
+  const d = Object.assign({}, b); delete d.id;
+  d.log = (b.log || []).slice(); d.lastById = byId; d.lastAt = at;
+  if (b.status === 'cuve') { d.status = 'frigo'; d.fridgeAt = at; d.log.push({step:'frigo', at, by, byId}); }
+  else if (b.status === 'frigo') {
+    const box = $('#tocoffre-' + b.id); d.toCoffre = box ? box.checked : true;
+    d.status = 'fini'; d.doneAt = at; d.pochons = r.output.qty; d.log.push({step:'fini', at, by, byId});
+  } else return;
+  S.confirm = null; Object.assign(b, d);
+  const ok = await Store.write('labs/' + id, d);
+  if (ok && d.status === 'fini' && d.toCoffre) await invAdjust(r.output.name, r.output.qty, 'divers', 'drug', `labo ${b.lab || ''}`.trim());
+  if (ok) toast(d.status === 'frigo' ? `${r.plates} plaquettes au frigo pour ${r.fridgeMin} minutes.` : `${r.output.qty} pochons prêts${d.toCoffre ? ' et rangés au coffre' : ''}.`);
+  render();
+}
+// Compte à rebours en direct + bip quand le frigo est prêt (si la page est ouverte).
+let audioCtx = null;
+document.addEventListener('pointerdown', () => { try { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} }, {once:true});
+function beep(){ try { if (!audioCtx) return; [0, 0.25, 0.5].forEach(t => { const o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.frequency.value = 880; g.gain.value = 0.08; o.connect(g); g.connect(audioCtx.destination); o.start(audioCtx.currentTime + t); o.stop(audioCtx.currentTime + t + 0.15); }); } catch(e) {} }
+const fridgeNotified = new Set();
+setInterval(() => {
+  const now = Date.now();
+  S.labs.filter(b => b.status === 'frigo').forEach(b => {
+    if (fridgeEnd(b) <= now && !fridgeNotified.has(b.id)) {
+      fridgeNotified.add(b.id);
+      if (now - fridgeEnd(b) < 5000) { beep(); toast(`Frigo prêt : ${b.lab || 'Labo'}. Casse les plaquettes !`); if (S.view === 'labos') scheduleRender(); }
+    }
+  });
+  if (S.view !== 'labos') return;
+  document.querySelectorAll('[data-until]').forEach(el => { const left = Number(el.dataset.until) - now; el.textContent = left <= 0 ? 'Prêt' : mmss(left); });
+  document.querySelectorAll('[data-bar]').forEach(el => { const left = Number(el.dataset.bar) - now; el.style.width = Math.min(100, Math.max(0, 100 - left / Number(el.dataset.len) * 100)) + '%'; });
+}, 1000);
+
 /* ---------- Actions ---------- */
 const A = {
   logout(){ logout(); },
@@ -1616,6 +1796,12 @@ const A = {
     const d = Object.assign({}, sx, {cancelled:true, cancelledBy:me().name, cancelledAt:Date.now()}); sx.cancelled = true; sx.cancelledBy = me().name;
     Store.write('sanctions/' + sx.id, d).then(ok => { if (ok) toast('Sanction annulée.'); }); render(); },
   ctab(t){ S.coffreTab = t.dataset.t; render(); },
+  labtab(t){ S.labTab = t.dataset.t; render(); },
+  labstart(t){ t.disabled = true; labStart(); },
+  labnext(t){ t.disabled = true; labNext(t.dataset.id); },
+  labdel(t){ const b = S.labs.find(x => x.id === t.dataset.id); S.confirm = null; if (!b || !isExec()) return;
+    const d = Object.assign({}, b, {_del:true, lastById:me().id, lastAt:Date.now()}); S.labs = S.labs.filter(x => x !== b);
+    Store.write('labs/' + b.id, d).then(ok => { if (ok) toast('Cuve annulée (les ingrédients ne sont pas rendus au coffre).'); }); render(); },
   invcat(t){ S.invCat = t.dataset.c2; render(); },
   invsel(t){ S.invSel = S.invSel === t.dataset.id ? null : t.dataset.id; S.confirm = null; render(); },
   mvq(t){ S.mvN = Number(t.dataset.n); const i = $('#mv-n'); if (i) i.value = S.mvN; },
@@ -1738,6 +1924,7 @@ document.addEventListener('change', e => {
     case 'crewlevel': saveConfig({crewLevel: Math.max(1, Math.min(99, parseInt(t.value,10) || 1))}); break;
     case 'ilabel': { const it = items(); it[Number(t.dataset.i)].label = t.value.trim().slice(0,40) || 'Objet'; saveConfig({coffreItems: it}); break; }
     case 'iqty': { const it = items(); it[Number(t.dataset.i)].qty = Math.max(1, parseInt(t.value,10) || 1); saveConfig({coffreItems: it}); break; }
+    case 'labn': S.labN = Math.max(1, Math.min(20, parseInt(t.value, 10) || 1)); S.labName = (($('#lab-name') || {}).value || S.labName); render(); break;
     case 'sxmember': S.sxMember = t.value; S.confirm = null; { const r = $('#sx-reason'); if (r) S.sxReason = r.value; } render(); break;
     case 'mgrade': { const m = S.mdocs.find(x => x.id === t.dataset.id); if (canEditMember(m) && gradeChoices().includes(t.value)) writeMember(m.id, {grade: t.value}); else render(); break; }
   }
@@ -1771,7 +1958,7 @@ route();
 let slowT;
 function connect(){
   Store.stopAll();
-  Object.assign(S, {config:null, cfgLoaded:false, ops:[], live:[], coffre:[], forms:[], mdocs:[], vault:{}, vaultOn:false, sanctions:[], inv:[], invlog:[], syncErr:false, slow:false, v3:undefined});
+  Object.assign(S, {config:null, cfgLoaded:false, ops:[], live:[], coffre:[], forms:[], mdocs:[], vault:{}, vaultOn:false, sanctions:[], inv:[], invlog:[], labs:[], syncErr:false, slow:false, v3:undefined});
   clearTimeout(slowT); slowT = setTimeout(() => { if (!Store.synced) { S.slow = true; renderSync(); } }, 10000);
   Store.watchDoc('crew/config', d => { S.config = d; S.cfgLoaded = true; scheduleRender(); });
   Store.watchDoc('crew/v3', d => { S.v3 = !!d; checkSec(); });
@@ -1789,6 +1976,7 @@ function connect(){
   Store.watchColl('formations', l => { S.forms = l; scheduleRender(); });
   Store.watchColl('sanctions', l => { S.sanctions = l; scheduleRender(); });
   Store.watchColl('inv', l => { S.inv = l; scheduleRender(); });
+  Store.watchColl('labs', l => { S.labs = l; scheduleRender(); });
   Store.watchColl('invlog', l => { S.invlog = l; scheduleRender(); }, {order:'at', dir:'desc', limit:40});
   renderSync(); render();
 }
