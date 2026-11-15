@@ -395,6 +395,13 @@ details.edit summary{cursor:pointer;font-size:12.5px;color:var(--accent-hi)}
 .sellrow{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;padding:12px 14px;border-radius:5px;background:var(--card);border:1px solid var(--line);border-left:3px solid var(--ok)}
 .sellrow > b{min-width:90px;align-self:center;font-size:14px}
 .opc.rec .bar{background:var(--p-neg)}
+
+.fline{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:5px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--pc)}
+.fline-h{display:flex;align-items:center;gap:10px}
+.fline-h .fi,.fcard-h .fi{display:grid;place-items:center;width:30px;height:30px;border-radius:5px;background:color-mix(in srgb,var(--pc) 18%,transparent);color:var(--pc);flex:none}
+.fline-h .st-pill{margin-left:auto}
+.fsteps li{padding:6px 8px;font-size:11.5px}
+.treq{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:5px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--pc)}
 @media (max-width:900px){
   .app{grid-template-columns:minmax(0,1fr)}
   .side{min-width:0;position:relative;top:0;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:18px 16px;gap:14px}
@@ -556,7 +563,7 @@ const NAV = [
   {id:'bilans', label:"Bilan d'activité", icon:'scroll', title:"Bilan d'activité", sub:'Historique des OP, gains et participation de chaque membre.'},
   {id:'coffre', label:'Coffre', icon:'box', title:'Coffre', sub:'Ce qu\'il y a dans le coffre de la villa, et qui le remplit cette semaine.'},
   {id:'labos', label:'Laboratoires', icon:'flask', title:'Laboratoires', sub:'Récoltes de pochons, ventes et coffre du labo.'},
-  {id:'formations', label:'Formations', icon:'grad', title:'Formations', sub:'Négociateur, surveillance des otages, braquage : prends ta formation.'},
+  {id:'formations', label:'Formations', icon:'grad', title:'Formations', sub:'Demande ta formation, un formateur l\'accepte et te forme.'},
   {id:'membres', label:'Membres', icon:'users', title:'Membres', sub:'La hiérarchie du crew et le parcours de chaque membre.'},
   {id:'sanctions', label:'Sanctions', icon:'alert', title:'Sanctions', sub:"Rappels à l'ordre et avertissements. 2 avertissements = viré."},
   {id:'parametres', label:'Paramètres', icon:'gear', title:'Paramètres', sub:'Nom et niveau du crew, contenu du coffre, profil.'},
@@ -1159,46 +1166,103 @@ VIEWS.coffre = () => `<div class="row" style="margin-bottom:14px"><div class="se
   ${S.coffreTab === 'roue' ? roueView() : invView('villa', {title:cfg().crewName || 'Crew', sub:'Coffre de la villa', cap:cfg().coffreCap || 2500, seed:INV_SEED})}`;
 
 /* ---------- Formations ---------- */
+// Parcours : le membre demande → un formateur accepte (et fixe la session) ou refuse → après la session : formé ou à refaire.
+// L'admin, le Patron et le Co-Patron désignent les formateurs de chaque formation (config.trainers).
+const fDoc = (mid, fid) => S.forms.find(f => f.id === `${mid}__${fid}`);
+const trainersOf = fid => (cfg().trainers || {})[fid] || [];
+const isTrainer = fid => !!me() && trainersOf(fid).includes(me().id);
+const canTrain = fid => isTrainer(fid) || (isExec() && !trainersOf(fid).length);
+const mName = id => (S.mdocs.find(m => m.id === id) || {}).name || '?';
+const F_STATUS = {inscrit:{label:'Demandée', cls:'wait'}, accepte:{label:'Session prévue', cls:'info'}, forme:{label:'Formé', cls:'ok'}};
+function writeForm(m, fid, patch, act){
+  const id = `${m.id}__${fid}`; const cur = fDoc(m.id, fid) || {};
+  const d = Object.assign({}, cur, {memberId:m.id, member:m.name, formation:fid}, patch);
+  delete d.id;
+  d.history = (cur.history || []).concat(act ? [{at:Date.now(), by:me() ? me().name : '?', act}] : []).slice(-20);
+  const ix = S.forms.findIndex(f => f.id === id); const local = Object.assign({}, d, {id});
+  if (ix >= 0) S.forms[ix] = local; else S.forms.push(local);
+  render(); return Store.write('formations/' + id, d);
+}
+// Tableau (Exécutants et plus) : — → demandée → formé → —
 function setForm(m, fid, status){
-  const id = `${m.id}__${fid}`; const path = 'formations/' + id;
-  const ix = S.forms.findIndex(f => f.id === id);
-  if (!status) { if (ix >= 0) S.forms.splice(ix,1); Store.write(path, {memberId:m.id, member:m.name, formation:fid, status:'none'}); }
-  else {
-    const prev = ix >= 0 ? S.forms[ix] : {};
-    const doc = {memberId:m.id, member:m.name, formation:fid, status, at: prev.at || Date.now()};
-    if (status === 'forme') { doc.validatedBy = me() ? me().name : '?'; doc.validatedAt = Date.now(); }
-    const local = Object.assign({}, doc, {id});
-    if (ix >= 0) S.forms[ix] = local; else S.forms.push(local);
-    Store.write(path, doc);
-  }
-  render();
+  if (!status) return writeForm(m, fid, {status:'none'}, 'retirée');
+  if (status === 'forme') return writeForm(m, fid, {status:'forme', validatedBy:me() ? me().name : '?', validatedById:me() ? me().id : '', validatedAt:Date.now()}, 'formé');
+  return writeForm(m, fid, {status, at:Date.now()}, 'demande');
+}
+function fStepper(st){
+  const idx = {inscrit:1, accepte:2, forme:3}[st] || 0;
+  return `<ol class="lsteps fsteps">${['Demande', 'Session', 'Formé'].map((l, i) => `<li class="${i + 1 < idx || idx === 3 ? 'done' : i + 1 === idx ? 'cur' : ''}"><b>${i + 1 < idx || idx === 3 ? ic('check') : i + 1}</b>${l}</li>`).join('')}</ol>`;
+}
+function myFormLine(f, my){
+  const d = fDoc(my.id, f.id); const st = d && d.status !== 'none' ? d.status : null;
+  const tr = trainersOf(f.id).filter(id => id !== my.id);
+  let info = '', act = '';
+  if (!st) {
+    info = tr.length ? `Formateurs : ${tr.map(mName).map(esc).join(', ')}` : 'Aucun formateur désigné : un Exécutant s\'en chargera.';
+    act = `${tr.length > 1 ? `<select class="inp" id="fw-${f.id}" aria-label="Formateur souhaité"><option value="">N'importe quel formateur</option>${tr.map(id => `<option value="${esc(id)}">${esc(mName(id))}</option>`).join('')}</select>` : ''}<button class="btn pri sm" data-a="fjoin" data-f="${f.id}">${ic('grad')}Demander la formation</button>`;
+  } else if (st === 'inscrit') {
+    const refs = (d.refusals || []).map(r => `${esc(r.by)} : ${esc(r.reason || 'pas dispo')}`);
+    info = `Demande envoyée${d.wantId ? ` à ${esc(mName(d.wantId))}` : ''} ${ago(d.at)}.${d.note ? ` <b>${esc(d.note)}</b>.` : ''}${refs.length ? `<br><span style="color:var(--warn)">Refusée par ${refs.join(' · ')}</span>` : ''}`;
+    act = `<button class="btn ghost sm" data-a="fleave" data-f="${f.id}">Annuler ma demande</button>`;
+  } else if (st === 'accepte') {
+    info = `Acceptée par <b>${esc(d.trainer)}</b>${d.session ? ` · session : <b>${esc(d.session)}</b>` : ' · session à caler avec lui'}.`;
+    act = `<button class="btn ghost sm" data-a="fleave" data-f="${f.id}">Annuler</button>`;
+  } else info = `Formé par <b>${esc(d.validatedBy || d.trainer || '?')}</b>${d.validatedAt ? ` le ${fmtD(d.validatedAt)}` : ''}.`;
+  return `<div class="fline" style="--pc:${f.col}"><div class="fline-h"><span class="fi">${ic(f.icon)}</span><b>${f.name}</b>${st ? `<span class="st-pill ${F_STATUS[st].cls}">${F_STATUS[st].label}</span>` : ''}</div>
+    ${fStepper(st)}<p class="hint" style="margin:0">${info}</p>${act ? `<div class="row">${act}</div>` : ''}</div>`;
+}
+function trainerRows(){
+  const my = me(); if (!my) return '';
+  const rows = [];
+  S.forms.forEach(d => {
+    const f = FBY[d.formation]; if (!f || d.memberId === my.id || !canTrain(f.id)) return;
+    const m = S.mdocs.find(x => x.id === d.memberId); if (!m || m.removed) return;
+    if (d.status === 'inscrit' && !(d.refusals || []).some(r => r.byId === my.id)) rows.push({d, f, m, kind:'pending'});
+    if (d.status === 'accepte' && (d.trainerId === my.id || isExec())) rows.push({d, f, m, kind:'mine'});
+  });
+  if (!rows.length) return `<p class="hint" style="margin:0">Aucune demande pour l'instant.</p>`;
+  rows.sort((a, b) => (a.kind === 'mine' ? 0 : 1) - (b.kind === 'mine' ? 0 : 1) || (a.d.at || 0) - (b.d.at || 0));
+  return `<div class="stack" style="gap:10px">${rows.map(({d, f, m, kind}) => { const key = esc(d.id);
+    if (kind === 'pending') return `<div class="treq" style="--pc:${f.col}"><div class="row"><b>${esc(m.name)}</b><span class="st-pill wait">${f.name}</span>${d.wantId === my.id ? '<span class="st-pill info">te demande toi</span>' : ''}<span class="spacer"></span><small style="color:var(--muted)">${ago(d.at)}</small></div>
+      <div class="row"><input class="inp" id="fs-${key}" maxlength="60" placeholder="Quand ? ex. ce soir 21h au QG" style="flex:1;min-width:160px"><button class="btn ok sm" data-a="facc" data-id="${key}">${ic('check')}Accepter de le former</button></div>
+      <div class="row"><input class="inp" id="fr-${key}" maxlength="80" placeholder="Raison du refus (facultatif)" style="flex:1;min-width:160px"><button class="btn ghost sm" data-a="fref" data-id="${key}">${ic('x')}Refuser</button></div></div>`;
+    return `<div class="treq" style="--pc:${f.col}"><div class="row"><b>${esc(m.name)}</b><span class="st-pill info">${f.name}</span><span class="spacer"></span><small style="color:var(--muted)">${d.trainerId === my.id ? 'tu le formes' : `formé par ${esc(d.trainer)}`}${d.session ? ` · ${esc(d.session)}` : ''}</small></div>
+      <div class="row"><button class="btn ok sm" data-a="fok" data-id="${key}">${ic('grad')}Valider : formé</button><button class="btn sm" data-a="fredo" data-id="${key}">À refaire</button><button class="btn ghost sm" data-a="fdrop" data-id="${key}">Me désister</button></div></div>`; }).join('')}</div>`;
 }
 VIEWS.formations = () => {
-  const my = me(); const lead = isLead(); const ms = members();
+  const my = me(); const boss = isBoss(); const exec = isExec(); const ms = members();
+  const iTrain = my && FORMATIONS.some(f => canTrain(f.id));
   const cards = FORMATIONS.map(f => {
     const formed = ms.filter(m => formState(m.id, f.id) === 'forme');
-    const waiting = ms.filter(m => formState(m.id, f.id) === 'inscrit');
-    const st = my ? formState(my.id, f.id) : null;
-    let act;
-    if (!my) act = '';
-    else if (st === 'forme') act = `<span class="st-pill ok">Tu es formé</span>`;
-    else if (st === 'inscrit') act = `<div class="row"><span class="st-pill wait">Inscrit · en attente d'un formateur</span><button class="btn ghost sm" data-a="fleave" data-f="${f.id}">Me désinscrire</button></div>`;
-    else act = `<button class="btn pri" data-a="fjoin" data-f="${f.id}">${ic('grad')}Prendre la formation</button>`;
+    const waiting = ms.filter(m => ['inscrit', 'accepte'].includes(formState(m.id, f.id)));
+    const tr = trainersOf(f.id);
     return `<article class="fcard" style="--pc:${f.col}">
-      <div class="fcard-h"><span class="fi">${ic(f.icon)}</span><div><h3>${f.name}</h3><span class="fs">${formed.length} formé${formed.length>1?'s':''} · ${waiting.length} en attente</span></div></div>
+      <div class="fcard-h"><span class="fi">${ic(f.icon)}</span><div><h3>${f.name}</h3><span class="fs">${formed.length} formé${formed.length>1?'s':''} · ${waiting.length} en cours</span></div></div>
       <p>${f.desc}</p>
       <ul class="prog">${f.prog.map(p => `<li>${ic('check')}<span>${p}</span></li>`).join('')}</ul>
-      ${act}
-      ${formed.length ? `<div class="chips">${formed.map(m => `<span class="pc" style="--pc:${f.col}">${esc(m.name)}</span>`).join('')}</div>` : ''}
-      ${lead && waiting.length ? `<div class="wait-l"><span class="field">Demandes à valider</span>${waiting.map(m => `<div class="r"><span style="flex:1">${esc(m.name)}</span><button class="btn ok sm" data-a="fvalid" data-m="${esc(m.id)}" data-f="${f.id}">${ic('check')}Valider</button><button class="btn ghost sm" data-a="fdeny" data-m="${esc(m.id)}" data-f="${f.id}" aria-label="Refuser">${ic('x')}</button></div>`).join('')}</div>` : ''}
+      <div><span class="field">Formateurs</span><div class="chips" style="margin-top:6px">${tr.length ? tr.map(id => `<span class="pc" style="--pc:${f.col}">${esc(mName(id))}</span>`).join('') : '<span class="hint" style="font-size:12px">Aucun pour l\'instant</span>'}</div></div>
+      ${formed.length ? `<div><span class="field">Formés</span><div class="chips" style="margin-top:6px">${formed.map(m => `<span class="pc" style="--pc:var(--ok)">${esc(m.name)}</span>`).join('')}</div></div>` : ''}
     </article>`;
   }).join('');
-  const table = ms.length ? `<div class="panel" style="margin-top:14px"><h3>Tableau des formations</h3><p class="hint">${lead ? 'Touche une case pour passer de « — » à « Inscrit » puis « Formé ».' : 'Qui est formé à quoi dans le crew.'}</p>
+  const stats = {}; S.forms.filter(d => d.status === 'forme' && d.validatedBy).forEach(d => { stats[d.validatedBy] = (stats[d.validatedBy] || 0) + 1; });
+  const lb = Object.entries(stats).sort((a, b) => b[1] - a[1]); const mx = lb.length ? lb[0][1] : 1;
+  const trainerAdmin = boss ? `<div class="panel"><h3>Désigner les formateurs</h3><p class="hint">Touche un nom pour l'ajouter ou le retirer. Les membres déjà formés sont marqués ✓ (conseillé).</p>
+    <div class="stack" style="gap:14px">${FORMATIONS.map(f => `<div><span class="field" style="color:${f.col}">${f.name}</span><div class="chips" style="margin-top:6px">${GRADES.flatMap(g => ms.filter(m => m.grade === g)).map(m => { const on = trainersOf(f.id).includes(m.id); const ok = formState(m.id, f.id) === 'forme';
+      return `<button class="tgl" data-a="ftrainer" data-f="${f.id}" data-m="${esc(m.id)}" aria-pressed="${on}" style="${on ? `border-color:${f.col}` : ''}">${esc(m.name)}${ok ? ' ✓' : ''}</button>`; }).join('')}</div></div>`).join('')}</div></div>` : '';
+  const table = ms.length ? `<div class="panel"><h3>Tableau des formations</h3><p class="hint">${exec ? 'Exécutants et plus : touche une case pour forcer « — » → « Demandée » → « Formé ».' : 'Qui est formé à quoi dans le crew.'}</p>
     <div class="tbl-wrap"><table><thead><tr><th>Membre</th>${FORMATIONS.map(f => `<th>${f.name}</th>`).join('')}</tr></thead><tbody>
-    ${GRADES.flatMap(g => ms.filter(m => m.grade === g)).map(m => `<tr><td><b>${esc(m.name)}</b> <span class="grade" style="--gc:${GCOL[m.grade]}">${esc(m.grade)}</span></td>${FORMATIONS.map(f => { const s = formState(m.id, f.id);
-      return `<td><button class="cell ${s==='forme'?'ok':s==='inscrit'?'ins':''}" data-a="fcell" data-m="${esc(m.id)}" data-f="${f.id}" ${lead?'':'disabled'}>${s==='forme'?'Formé':s==='inscrit'?'Inscrit':'—'}</button></td>`; }).join('')}</tr>`).join('')}
+    ${GRADES.flatMap(g => ms.filter(m => m.grade === g)).map(m => `<tr><td><b>${esc(m.name)}</b> <span class="grade" style="--gc:${GCOL[m.grade]}">${esc(m.grade)}</span></td>${FORMATIONS.map(f => { const s = formState(m.id, f.id); const isT = trainersOf(f.id).includes(m.id);
+      return `<td><button class="cell ${s==='forme'?'ok':s?'ins':''}" data-a="fcell" data-m="${esc(m.id)}" data-f="${f.id}" ${exec?'':'disabled'}>${s==='forme'?'Formé':s==='accepte'?'Session':s==='inscrit'?'Demandée':'—'}${isT ? ' · formateur' : ''}</button></td>`; }).join('')}</tr>`).join('')}
     </tbody></table></div></div>` : '';
-  return `<div class="fgrid">${cards}</div>${table}`;
+  return `<div class="cols"><div class="stack">
+      ${my ? `<div class="panel"><h3>Mes formations</h3><div class="stack" style="gap:10px;margin-top:8px">${FORMATIONS.map(f => myFormLine(f, my)).join('')}</div></div>` : ''}
+    </div><div class="stack">
+      ${iTrain ? `<div class="panel"><h3>À former</h3><p class="hint">${FORMATIONS.filter(f => isTrainer(f.id)).map(f => f.name).join(', ') ? `Tu es formateur : ${FORMATIONS.filter(f => isTrainer(f.id)).map(f => f.name).join(', ')}.` : 'Demandes des formations sans formateur désigné.'}</p>${trainerRows()}</div>` : ''}
+      <div class="panel"><h3>Meilleurs formateurs</h3>${lb.length ? `<div class="lb">${lb.map(([n, c], i) => `<div class="lb-r"><span class="rk">${i + 1}</span><span class="nm"><span>${esc(n)}</span><span class="track"><i style="width:${Math.max(4, c / mx * 100)}%"></i></span></span><span class="v">${c} formé${c > 1 ? 's' : ''}</span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Personne n\'a encore validé de formation.</p>'}</div>
+      ${trainerAdmin}
+    </div></div>
+    <div class="fgrid" style="margin-top:14px">${cards}</div>
+    <div style="margin-top:14px">${table}</div>`;
 };
 
 /* ---------- Membres ---------- */
@@ -1949,11 +2013,25 @@ const A = {
   citem(t){ const cur = S.coffre.find(c => c.id === thisWeek()); if (!cur) return; const items = cur.items.map(x => Object.assign({}, x)); const i = Number(t.dataset.i); items[i].done = !items[i].done; cur.items = items;
     if (!(isExec() || (me() && me().id === cur.memberId))) return;
     const doc = Object.assign({}, cur); delete doc.id; delete doc._k; Store.write('coffre/' + cur.id, doc); render(); },
-  fjoin(t){ if (me()) { setForm(me(), t.dataset.f, 'inscrit'); toast('Demande envoyée : un lead validera ta formation.'); } },
-  fleave(t){ if (me()) setForm(me(), t.dataset.f, null); },
-  fvalid(t){ if (!isExec()) return; const m = members().find(x => x.id === t.dataset.m); if (m) { setForm(m, t.dataset.f, 'forme'); toast(`${m.name} est formé.`); } },
-  fdeny(t){ const m = members().find(x => x.id === t.dataset.m); if (m) setForm(m, t.dataset.f, null); },
-  fcell(t){ if (!isLead()) return; const m = members().find(x => x.id === t.dataset.m); if (!m) return; const s = formState(m.id, t.dataset.f); setForm(m, t.dataset.f, s === null ? 'inscrit' : s === 'inscrit' ? 'forme' : null); },
+  fjoin(t){ const my = me(); if (!my) return; const f = t.dataset.f; const sel = $('#fw-' + f); const want = sel ? sel.value : (trainersOf(f).filter(id => id !== my.id).length === 1 ? trainersOf(f).filter(id => id !== my.id)[0] : '');
+    writeForm(my, f, {status:'inscrit', at:Date.now(), wantId:want || '', trainerId:'', trainer:'', session:'', note:'', refusals:[]}, 'demande' + (want ? ` à ${mName(want)}` : ''));
+    toast(want ? `Demande envoyée à ${mName(want)}.` : 'Demande envoyée aux formateurs.'); },
+  fleave(t){ const my = me(); if (my) writeForm(my, t.dataset.f, {status:'none'}, 'annulée'); },
+  facc(t){ const d = S.forms.find(x => x.id === t.dataset.id); const my = me(); if (!d || !my) return; const m = S.mdocs.find(x => x.id === d.memberId); if (!m) return;
+    const sess = (($('#fs-' + d.id) || {}).value || '').trim().slice(0, 60);
+    writeForm(m, d.formation, {status:'accepte', trainerId:my.id, trainer:my.name, session:sess, acceptedAt:Date.now()}, `acceptée par ${my.name}${sess ? ' · ' + sess : ''}`).then(ok => { if (ok) toast(`Tu formes ${m.name}. Préviens-le pour la session.`); }); },
+  fref(t){ const d = S.forms.find(x => x.id === t.dataset.id); const my = me(); if (!d || !my) return; const m = S.mdocs.find(x => x.id === d.memberId); if (!m) return;
+    const reason = (($('#fr-' + d.id) || {}).value || '').trim().slice(0, 80);
+    writeForm(m, d.formation, {status:'inscrit', wantId: d.wantId === my.id ? '' : (d.wantId || ''), refusals:(d.refusals || []).concat([{byId:my.id, by:my.name, reason, at:Date.now()}])}, `refusée par ${my.name}${reason ? ' : ' + reason : ''}`).then(ok => { if (ok) toast('Demande refusée.'); }); },
+  fok(t){ const d = S.forms.find(x => x.id === t.dataset.id); const my = me(); if (!d || !my) return; const m = S.mdocs.find(x => x.id === d.memberId); if (!m) return;
+    writeForm(m, d.formation, {status:'forme', validatedBy:my.name, validatedById:my.id, validatedAt:Date.now()}, `formé par ${my.name}`).then(ok => { if (ok) toast(`${m.name} est formé ${FBY[d.formation].name}.`); }); },
+  fredo(t){ const d = S.forms.find(x => x.id === t.dataset.id); const my = me(); if (!d || !my) return; const m = S.mdocs.find(x => x.id === d.memberId); if (!m) return;
+    writeForm(m, d.formation, {status:'inscrit', trainerId:'', trainer:'', session:'', note:`À refaire (avis de ${my.name})`, at:Date.now()}, `à refaire (${my.name})`).then(ok => { if (ok) toast(`${m.name} devra refaire la formation.`); }); },
+  fdrop(t){ const d = S.forms.find(x => x.id === t.dataset.id); const my = me(); if (!d || !my) return; const m = S.mdocs.find(x => x.id === d.memberId); if (!m) return;
+    writeForm(m, d.formation, {status:'inscrit', trainerId:'', trainer:'', session:'', note:'Formateur désisté'}, `${my.name} s'est désisté`).then(ok => { if (ok) toast('Demande remise aux autres formateurs.'); }); },
+  ftrainer(t){ if (!isBoss()) return; const f = t.dataset.f, id = t.dataset.m; const all = Object.assign({}, cfg().trainers || {}); const l = (all[f] || []).slice(); const i = l.indexOf(id);
+    if (i >= 0) l.splice(i, 1); else l.push(id); all[f] = l; saveConfig({trainers: all}); toast(i >= 0 ? `${mName(id)} n'est plus formateur ${FBY[f].name}.` : `${mName(id)} est formateur ${FBY[f].name}.`); },
+  fcell(t){ if (!isExec()) return; const m = members().find(x => x.id === t.dataset.m); if (!m) return; const s = formState(m.id, t.dataset.f); setForm(m, t.dataset.f, s === null ? 'inscrit' : s === 'forme' ? null : 'forme'); },
   madd(){ if (!isBoss()) return; const nameEl = $('#madd-name'); const name = (nameEl.value || '').trim().slice(0,30); if (!name) { nameEl.focus(); return; }
     if (members().some(m => m.name.toLowerCase() === name.toLowerCase())) { toast(`${name} fait déjà partie du crew.`); return; }
     let id = slug(name); if (/^\d/.test(id)) id = 'm' + id; while (S.mdocs.some(m => m.id === id)) id += '-2';

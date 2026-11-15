@@ -76,11 +76,18 @@ service cloud.firestore {
       return L >= 2 && d.memberId != myId(c) && d.byId == myId(c) && d.type in ['rappel', 'avert']
         && canTarget(L, member(c, d.memberId));
     }
+    // Formations : le membre demande / annule pour lui-même ; un formateur désigné (config.trainers)
+    // accepte, refuse, valide ou fait refaire pour les autres ; les Exécutants et plus peuvent tout faire.
     function formationWrite(c, id) {
       let L = lvl(c);
       let d = request.resource.data;
-      return L >= 2 || (L >= 1 && d.memberId == myId(c) && id == myId(c) + '__' + d.formation
-        && d.status in ['inscrit', 'none'] && (resource == null || resource.data.status != 'forme'));
+      let mine = L >= 1 ? myId(c) : '';
+      let tr = L >= 1 ? get(/databases/$(database)/documents/crews/$(c)/crew/config).data.get('trainers', {}).get(d.formation, []) : [];
+      return L >= 2
+        || (L >= 1 && d.memberId == mine && id == mine + '__' + d.formation
+            && d.status in ['inscrit', 'none'] && (resource == null || resource.data.status != 'forme'))
+        || (L >= 1 && mine in tr && d.memberId != mine && id == d.memberId + '__' + d.formation
+            && d.status in ['inscrit', 'accepte', 'forme']);
     }
     function coffreUpdate(c) {
       let L = lvl(c);
