@@ -27,6 +27,7 @@
   --font:"Poppins",ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html{height:100%}
 body{
   margin:0;
@@ -402,6 +403,33 @@ details.edit summary{cursor:pointer;font-size:12.5px;color:var(--accent-hi)}
 .fline-h .st-pill{margin-left:auto}
 .fsteps li{padding:6px 8px;font-size:11.5px}
 .treq{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:5px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--pc)}
+
+/* Renseignements */
+.orggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:10px}
+.orgcard{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:4px 12px;align-items:center;text-align:left;padding:14px 16px;border-radius:5px;background:var(--card);border:1px solid var(--line-2);border-left:4px solid var(--oc)}
+.orgcard:hover{background:#202126}
+.orgcard .sw,.orghead .sw{width:14px;height:14px;border-radius:50%;background:var(--oc);box-shadow:0 0 0 3px color-mix(in srgb,var(--oc) 30%,transparent)}
+.orgcard .ob{display:flex;flex-direction:column;min-width:0}
+.orgcard .ob b{font-size:15px;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.orgcard small{color:var(--muted);font-size:12px}
+.orgcard .om{grid-column:2/-1}
+.orghead{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 16px;margin-bottom:14px;border-radius:5px;background:linear-gradient(90deg,color-mix(in srgb,var(--oc) 22%,transparent),transparent);border:1px solid var(--line-2)}
+.orghead h2{margin:0;font-size:20px;text-transform:uppercase}
+.orghead small{color:var(--muted)}
+.imgslot{display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:5px;border:1px dashed var(--line-2);background:rgba(0,0,0,.2)}
+.imgslot.armed{border-color:var(--accent-hi);background:var(--accent-soft)}
+.imgph{display:grid;place-items:center;gap:6px;min-height:110px;color:var(--dim);font-size:12px;text-align:center}
+.imgthumb{padding:0;border:0;background:none;border-radius:4px;overflow:hidden;display:block}
+.imgthumb img{display:block;width:100%;max-height:260px;object-fit:cover}
+.person{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.person .pimg{width:180px;max-width:100%}
+.person .pinfo{flex:1;min-width:160px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.person .pinfo p{margin:0;font-size:13px;color:#c9ccd2}
+.person .pinfo small{color:var(--muted);font-size:11.5px}
+textarea.inp{resize:vertical;font:inherit}
+.lb{display:flex;align-items:center;justify-content:center;z-index:90}
+.lb img{max-width:100%;max-height:90vh;border-radius:6px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.lb .lbx{position:fixed;top:max(16px,env(safe-area-inset-top,0px));right:max(16px,env(safe-area-inset-right,0px))}
 @media (max-width:900px){
   .app{grid-template-columns:minmax(0,1fr)}
   .side{min-width:0;position:relative;top:0;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:18px 16px;gap:14px}
@@ -496,7 +524,8 @@ const ART = {
   oil:'<path d="M6 36h42v8H6zM12 44v15M42 44v15M27 36V9l13 27M27 9 15 36M48 36l9-21M4 59h56"/>',
   bunker:'<path d="M6 52c0-16 12-28 26-28s26 12 26 28zM22 52V40a10 10 0 0 1 20 0v12M2 52h60M32 24v-8M26 16h12"/>',
   flag:'<path d="M14 58V8M14 10h30l-6 9 6 9H14"/><path d="M6 58h20M40 40l14 14M54 40 40 54"/>',
-  labo:'<path d="M20 6h12M23 6v14L10 46a4 4 0 0 0 4 6h24a4 4 0 0 0 4-6L29 20V6M15 38h22"/><path d="M42 14l14 14M56 14 42 28"/>'
+  labo:'<path d="M20 6h12M23 6v14L10 46a4 4 0 0 0 4 6h24a4 4 0 0 0 4-6L29 20V6M15 38h22"/><path d="M42 14l14 14M56 14 42 28"/>',
+  po:'<circle cx="32" cy="32" r="20"/><circle cx="32" cy="32" r="8"/><path d="M32 4v14M32 46v14M4 32h14M46 32h14"/>'
 };
 const art = k => `<svg class="art-ic" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ART[k]}</svg>`;
 
@@ -504,6 +533,7 @@ const MISSIONS = [
   // Opérations du crew (hors tablette) : pas d'XP, de niveau ni de temps de recharge ; gain facultatif.
   {id:'territoire', name:'Attaque de territoire', min:4, max:23, dur:30, lvl:0, hue:0,   art:'flag', crew:true, emoji:'🏴'},
   {id:'labo-atk',   name:'Attaque de laboratoire', min:4, max:15, dur:30, lvl:0, hue:270, art:'labo', crew:true, emoji:'🧪'},
+  {id:'po-orga',    name:'PO sur Orga', min:2, max:15, dur:30, lvl:0, hue:350, art:'po', crew:true, emoji:'🎯', intel:true},
   {id:'gruppe6',  name:'Gruppe6',               min:2, max:7,  xp:2500,  dur:30, lvl:1,  cd:24,  hue:140, art:'truck'},
   {id:'bateau',   name:'Bateau de trafiquant',  min:4, max:7,  xp:1500,  dur:30, lvl:3,  cd:48,  hue:205, art:'ship'},
   {id:'flecca',   name:'Flecca Banque',         min:4, max:10, xp:3500,  dur:30, lvl:5,  cd:48,  hue:150, art:'bank'},
@@ -563,6 +593,7 @@ const NAV = [
   {id:'bilans', label:"Bilan d'activité", icon:'scroll', title:"Bilan d'activité", sub:'Historique des OP, gains et participation de chaque membre.'},
   {id:'coffre', label:'Coffre', icon:'box', title:'Coffre', sub:'Ce qu\'il y a dans le coffre de la villa, et qui le remplit cette semaine.'},
   {id:'labos', label:'Laboratoires', icon:'flask', title:'Laboratoires', sub:'Récoltes de pochons, ventes et coffre du labo.'},
+  {id:'renseignements', label:'Renseignements', icon:'eye', title:'Renseignements', sub:'Fiches des autres organisations : villa, radio, patron, membres connus.'},
   {id:'formations', label:'Formations', icon:'grad', title:'Formations', sub:'Demande ta formation, un formateur l\'accepte et te forme.'},
   {id:'membres', label:'Membres', icon:'users', title:'Membres', sub:'La hiérarchie du crew et le parcours de chaque membre.'},
   {id:'sanctions', label:'Sanctions', icon:'alert', title:'Sanctions', sub:"Rappels à l'ordre et avertissements. 2 avertissements = viré."},
@@ -642,6 +673,7 @@ const Store = {
     const sub = {fire:() => cb(this.local[path] ? JSON.parse(JSON.stringify(this.local[path])) : null)};
     this.subs.push(sub); sub.fire(); return () => {};
   },
+  async getDoc(path){ if (this.mode !== 'fire') return this.local[path] || null; const d = await this.db.doc(this.p(path)).get(); return d.exists ? d.data() : null; },
   async getRoot(path){ if (this.mode !== 'fire') return null; const d = await this.db.doc(path).get(); return d.exists ? d.data() : null; },
   // Retire l'identifiant interne et l'ancien champ _k (qui contenait le code de l'auteur).
   sign(data){ const d = JSON.parse(JSON.stringify(data)); delete d.id; delete d._k; return d; },
@@ -684,7 +716,7 @@ const S = {
   view: 'missions', meId: LS.get('crew-me', null),
   config: null, cfgLoaded:false, ops: [], live: [], coffre: [], forms: [],
   wiz: null, sel: null, confirm: null, period: 'week', spinning: false, pending: false,
-  wheelRot: 0, idOpen: false, syncErr:false, slow:false, mdocs: [], vault: {}, reveal: {}, loginOpen: false, secOpen: false, myKey: null, lw: null, labs: [], labTab: 'synthese', labN: 1, labSite: null, labSub: 'prod', labEdit: null, invPlace: 'villa', invSeed: null, sanctions: [], sxType: 'avert', sxMember: '', sxReason: '', inv: [], invlog: [], invCat: 'all', invQ: '', invSel: null, mvN: 1, coffreTab: 'inv', vaultOn: false
+  wheelRot: 0, idOpen: false, syncErr:false, slow:false, mdocs: [], vault: {}, reveal: {}, loginOpen: false, secOpen: false, myKey: null, intel: [], orgSel: null, orgQ: '', pasteSlot: null, lw: null, labs: [], labTab: 'synthese', labN: 1, labSite: null, labSub: 'prod', labEdit: null, invPlace: 'villa', invSeed: null, sanctions: [], sxType: 'avert', sxMember: '', sxReason: '', inv: [], invlog: [], invCat: 'all', invQ: '', invSel: null, mvN: 1, coffreTab: 'inv', vaultOn: false
 };
 const cfg = () => Object.assign({crewName:'Crew', crewLevel:1, members:[], coffreItems:DEFAULT_ITEMS, coffreExclude:[], coffreExcludeLast:true}, S.config || {});
 const members = () => S.mdocs.filter(m => !m.removed);
@@ -861,13 +893,14 @@ function autoVehicles(w){
 }
 function opFromWiz(w){
   return {missionId:w.missionId, missionName:w.missionName, result:w.result, total: w.result==='fail' || (MBY[w.missionId] || {}).crew ? 0 : parseMoney(w.total),
-    participants: w.participants.map(n => ({name:n, poste: w.postes[n] || null})), withPostes: w.withPostes};
+    participants: w.participants.map(n => ({name:n, poste: w.postes[n] || null})), withPostes: w.withPostes, targetOrg: (w.targetOrg || '').trim()};
 }
 function discordText(op){
   const ok = op.result !== 'fail';
   const mi = MBY[op.missionId] || {};
   const L = [`# ${ok ? (mi.emoji || '💵') : '❌'} ${op.missionName}${ok ? '' : ' (échouée)'}`, '',
     `Détail : ${op.participants.map(p => p.name).join(', ') || '—'}`];
+  if (op.targetOrg) L.push(`Organisation visée : ${op.targetOrg}`);
   if (!mi.crew) L.push(`Total gagné = ${money(op.total)} $`);
   if (op.withPostes) {
     const rows = POSTES.map(p => { const n = op.participants.filter(x => x.poste === p.id).map(x => x.name); return n.length ? `${p.emoji} ${p.name} : ${n.join(', ')}` : null; }).filter(Boolean);
@@ -968,6 +1001,8 @@ function stepBilan(w, m){
       <div class="stack">
         <div class="field">Résultat de l'OP
           <div class="seg" role="group" aria-label="Résultat"><button data-a="wresult" data-r="ok" aria-pressed="${w.result!=='fail'}">Réussie</button><button data-a="wresult" data-r="fail" aria-pressed="${w.result==='fail'}">Échouée</button></div></div>
+        ${m.intel ? `<label class="field" for="tgt">Organisation visée (facultatif)<input class="inp" id="tgt" data-c="tgt" list="tgt-list" maxlength="40" placeholder="Nom de l'orga prise en PO" value="${esc(w.targetOrg || '')}"><datalist id="tgt-list">${S.intel.map(o => `<option value="${esc(o.name)}">`).join('')}</datalist></label>
+          <p class="hint" style="margin:0">À l'enregistrement, sa fiche est créée ou complétée dans <b>Renseignements</b> : ajoutes-y ensuite les infos récoltées.</p>` : ''}
         ${m.crew ? `<p class="hint" style="margin:0">Pas d'argent à déclarer pour cette mission : enregistre directement le bilan.</p>` : ''}
         ${w.result !== 'fail' && !m.crew ? `<label class="field" for="total">Total gagné ($)
           <input class="inp money" id="total" data-c="total" inputmode="numeric" autocomplete="off" placeholder="1.733.650" value="${esc(w.total ? money(parseMoney(w.total)) : '')}"></label>
@@ -1632,6 +1667,8 @@ const fmtQty = n => new Intl.NumberFormat('fr-FR').format(n || 0);
 const fmtKg = kg => kg >= 1 ? `${kg.toFixed(2)}kg` : kg > 0 ? `${Math.round(kg*1000)}g` : '';
 const CAT_ORDER = ['labo','muni','armes','nourr','vet','divers'];
 const placeOf = it => it.place || 'villa';
+const normName = x => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/s$/, '').trim();
+const invByName = (name, place) => S.inv.find(x => placeOf(x) === (place || 'villa') && normName(x.name) === normName(name));
 const invItems = place => S.inv.filter(it => placeOf(it) === place);
 function invSorted(){ return invItems(S.invPlace).sort((a,b) => CAT_ORDER.indexOf(a.cat) - CAT_ORDER.indexOf(b.cat) || a.name.localeCompare(b.name, 'fr')); }
 function invFiltered(){ const q = (S.invQ || '').trim().toLowerCase(); return invSorted().filter(it => (S.invCat === 'all' || it.cat === S.invCat) && (!q || it.name.toLowerCase().includes(q))); }
@@ -1902,6 +1939,160 @@ VIEWS.labos = () => {
   return head + labsMain();
 };
 
+/* ---------- Renseignements (fiches des autres organisations) ---------- */
+// Une fiche par organisation (collection intel). Les photos sont compressées et rangées à part (collection intelimg),
+// chargées seulement quand on ouvre la fiche.
+const THREATS = {faible:{label:'Menace faible', cls:'ok'}, moyenne:{label:'Menace moyenne', cls:'wait'}, haute:{label:'Menace haute', cls:'fail'}};
+const orgById = id => S.intel.find(o => o.id === id);
+const orgByName = n => S.intel.find(o => normName(o.name) === normName(n));
+const imgCache = {}; const imgLoading = new Set();
+function loadImg(id){
+  if (!id || imgCache[id] || imgLoading.has(id)) return;
+  imgLoading.add(id);
+  Store.getDoc('intelimg/' + id).then(d => { imgCache[id] = d && d.data ? d.data : 'none'; imgLoading.delete(id); scheduleRender(); }, () => { imgLoading.delete(id); });
+}
+// Compresse une image (fichier ou capture collée) en JPEG < ~700 Ko.
+function compressImage(file){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file); const img = new Image();
+    img.onload = () => {
+      let max = 1400, q = 0.75, out = '';
+      for (let i = 0; i < 6; i++) {
+        const k = Math.min(1, max / Math.max(img.width, img.height));
+        const cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        out = cv.toDataURL('image/jpeg', q);
+        if (out.length < 700000) break;
+        max = Math.round(max * 0.8); q = Math.max(0.5, q - 0.08);
+      }
+      URL.revokeObjectURL(url); resolve(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image')); };
+    img.src = url;
+  });
+}
+// slot = "orgId|champ" : villa, boss, ou p:<idPersonne>
+async function uploadIntelImg(slot, file){
+  if (!me() || !file || !/^image\//.test(file.type)) { toast('Choisis une image (photo ou capture d\'écran).'); return; }
+  const [orgId, field] = slot.split('|'); const o = orgById(orgId); if (!o) return;
+  toast('Envoi de la photo…');
+  try {
+    const data = await compressImage(file);
+    const id = uid('img'); imgCache[id] = data;
+    const ok = await Store.write('intelimg/' + id, {data, orgId, at:Date.now(), by:me().name, byId:me().id});
+    if (!ok) return;
+    const d = Object.assign({}, o);
+    if (field === 'villa') d.villa = Object.assign({}, o.villa || {}, {imgId:id});
+    else if (field === 'boss') d.boss = Object.assign({}, o.boss || {}, {imgId:id});
+    else if (field.startsWith('p:')) d.people = (o.people || []).map(p => p.id === field.slice(2) ? Object.assign({}, p, {imgId:id}) : p);
+    await saveOrg(d, field === 'villa' ? 'photo de la villa' : field === 'boss' ? 'carte d\'identité du patron' : 'carte d\'identité');
+    toast('Photo ajoutée.');
+  } catch(e) { toast("Impossible de lire cette image."); }
+}
+function saveOrg(o, act){
+  const d = Object.assign({}, o); delete d.id;
+  d.lastById = me().id; d.lastBy = me().name; d.lastAt = Date.now();
+  if (act) d.log = (o.log || []).concat([{at:Date.now(), by:me().name, act}]).slice(-30);
+  const ix = S.intel.findIndex(x => x.id === o.id); const local = Object.assign({}, d, {id:o.id});
+  if (ix >= 0) S.intel[ix] = local; else S.intel.push(local);
+  render(); return Store.write('intel/' + o.id, d);
+}
+function newOrg(name){
+  let id = slug(name) || 'orga'; while (S.intel.some(x => x.id === id)) id += '-2';
+  return {id, name, color:'', claims:'', radio:'', threat:'moyenne', villa:{desc:'', imgId:''}, boss:{name:'', notes:'', imgId:''}, people:[], notes:[], createdAt:Date.now(), by:me().name, byId:me().id};
+}
+function imgSlot(orgId, field, imgId, label){
+  const slot = `${orgId}|${field}`; const armed = S.pasteSlot === slot;
+  if (imgId) loadImg(imgId);
+  const src = imgId && imgCache[imgId] && imgCache[imgId] !== 'none' ? imgCache[imgId] : '';
+  return `<div class="imgslot ${armed ? 'armed' : ''}" data-drop-img="${esc(slot)}">
+    ${src ? `<button class="imgthumb" data-a="imgview" data-id="${esc(imgId)}" aria-label="Agrandir ${esc(label)}"><img src="${src}" alt="${esc(label)}"></button>`
+      : imgId ? `<div class="imgph">Chargement…</div>` : `<div class="imgph">${ic('eye')}<span>${esc(label)}</span></div>`}
+    <div class="row" style="gap:6px"><label class="btn sm">${ic('plus')}${imgId ? 'Changer' : 'Ajouter'}<input type="file" accept="image/*" data-img-slot="${esc(slot)}" hidden></label>
+      <button class="btn ghost sm" data-a="armpaste" data-slot="${esc(slot)}">${armed ? 'Fais Ctrl+V…' : 'Coller une capture'}</button></div>
+  </div>`;
+}
+function orgCard(o){
+  return `<button class="orgcard" data-a="orgopen" data-id="${esc(o.id)}" style="--oc:${esc(o.colorHex || '#5f646d')}">
+    <span class="sw"></span><span class="ob"><b>${esc(o.name)}</b><small>${esc(o.color || 'Couleur inconnue')}${o.radio ? ` · radio ${esc(o.radio)}` : ''}</small></span>
+    <span class="st-pill ${(THREATS[o.threat] || THREATS.moyenne).cls}">${(THREATS[o.threat] || THREATS.moyenne).label.replace('Menace ', '')}</span>
+    <small class="om">${(o.people || []).length} membre${(o.people || []).length > 1 ? 's' : ''} connu${(o.people || []).length > 1 ? 's' : ''} · ${(o.notes || []).length} info${(o.notes || []).length > 1 ? 's' : ''}${o.lastAt ? ` · ${ago(o.lastAt)}` : ''}</small></button>`;
+}
+function orgDetail(o){
+  const exec = isExec(); const k = 'orgdel:' + o.id; const id = esc(o.id);
+  const th = THREATS[o.threat] || THREATS.moyenne;
+  const people = (o.people || []).map(p => `<div class="person"><div class="pimg">${imgSlot(o.id, 'p:' + p.id, p.imgId, "Carte d'identité")}</div>
+      <div class="pinfo"><b>${esc(p.name)}</b>${p.role ? `<span class="st-pill info">${esc(p.role)}</span>` : ''}${p.radio ? `<small>Radio ${esc(p.radio)}</small>` : ''}${p.notes ? `<p>${esc(p.notes)}</p>` : ''}<small>Ajouté par ${esc(p.by || '?')} · ${fmtD(p.at || Date.now())}</small>
+      ${exec || p.byId === S.meId ? `<button class="btn ghost sm" data-a="persdel" data-id="${id}" data-p="${esc(p.id)}">${ic('trash')}Retirer</button>` : ''}</div></div>`).join('');
+  const notes = (o.notes || []).slice().sort((a, b) => b.at - a.at).map(n => `<div class="hist-r"><span>${esc(n.text)}<br><small>${esc(n.by)} · ${fmtDT(n.at)}${n.source ? ` · ${esc(n.source)}` : ''}</small></span>
+      <span>${exec || n.byId === S.meId ? `<button class="btn ghost sm" data-a="notedel" data-id="${id}" data-n="${esc(n.id)}" aria-label="Supprimer">${ic('x')}</button>` : ''}</span></div>`).join('');
+  return `<div class="row" style="margin-bottom:14px"><button class="btn sm" data-a="orgback">${ic('left')}Toutes les organisations</button><span class="spacer"></span>
+      ${exec ? (S.confirm === k ? `<button class="btn red sm" data-a="orgdel" data-id="${id}">Supprimer la fiche</button><button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}">${ic('trash')}Supprimer la fiche</button>`) : ''}</div>
+    <div class="orghead" style="--oc:${esc(o.colorHex || '#5f646d')}"><span class="sw"></span><div><h2>${esc(o.name)}</h2><small>${esc(o.color || 'Couleur / signes inconnus')}${o.lastBy ? ` · mis à jour par ${esc(o.lastBy)} ${ago(o.lastAt)}` : ''}</small></div><span class="spacer"></span><span class="st-pill ${th.cls}">${th.label}</span></div>
+    <div class="cols"><div class="stack">
+      <div class="panel"><h3>Identité de l'organisation</h3><div class="stack" style="gap:8px;margin-top:8px">
+        <div class="row"><label class="field" style="flex:1;min-width:150px">Nom<input class="inp" id="og-name" maxlength="40" value="${esc(o.name)}"></label>
+          <label class="field">Menace<select class="inp" id="og-threat">${Object.entries(THREATS).map(([k2, t]) => `<option value="${k2}" ${k2 === o.threat ? 'selected' : ''}>${t.label.replace('Menace ', '')}</option>`).join('')}</select></label></div>
+        <div class="row"><label class="field" style="flex:1;min-width:150px">Couleur / signes distinctifs<input class="inp" id="og-color" maxlength="60" placeholder="Ex. bandana rouge, masques noirs" value="${esc(o.color || '')}"></label>
+          <label class="field">Teinte<input class="inp" id="og-hex" type="color" value="${esc(o.colorHex || '#5f646d')}" style="width:60px;padding:3px"></label></div>
+        <label class="field">Ce qu'ils revendiquent<input class="inp" id="og-claims" maxlength="120" placeholder="Territoire, quartier, business…" value="${esc(o.claims || '')}"></label>
+        <label class="field">Fréquence radio<input class="inp" id="og-radio" maxlength="20" placeholder="Ex. 412.5" value="${esc(o.radio || '')}"></label>
+        <div class="row"><button class="btn pri sm" data-a="orgsave" data-id="${id}">Enregistrer</button></div></div></div>
+      <div class="panel"><h3>Villa / QG</h3><p class="hint">Mets une capture de la carte avec le point de leur villa.</p>
+        ${imgSlot(o.id, 'villa', (o.villa || {}).imgId, 'Point sur la carte')}
+        <label class="field" style="margin-top:10px">Adresse / description<input class="inp" id="og-villa" maxlength="120" placeholder="Ex. Vinewood Hills, grande villa blanche" value="${esc((o.villa || {}).desc || '')}"></label>
+        <div class="row" style="margin-top:8px"><button class="btn pri sm" data-a="orgsave" data-id="${id}">Enregistrer</button></div></div>
+      <div class="panel"><h3>Patron</h3>
+        <div class="person"><div class="pimg">${imgSlot(o.id, 'boss', (o.boss || {}).imgId, "Carte d'identité du patron")}</div>
+          <div class="pinfo" style="flex:1"><label class="field">Nom prénom<input class="inp" id="og-bossname" maxlength="40" value="${esc((o.boss || {}).name || '')}"></label>
+            <label class="field">Infos sur le patron<input class="inp" id="og-bossnotes" maxlength="200" placeholder="Voiture, habitudes, téléphone…" value="${esc((o.boss || {}).notes || '')}"></label>
+            <button class="btn pri sm" data-a="orgsave" data-id="${id}">Enregistrer</button></div></div></div>
+    </div><div class="stack">
+      <div class="panel"><h3>Ajouter une info</h3><div class="stack" style="gap:8px;margin-top:8px">
+        <textarea class="inp" id="nt-text" rows="3" maxlength="500" placeholder="Ce que vous avez appris (lieu de deal, véhicules, alliés, planque…)"></textarea>
+        <input class="inp" id="nt-source" maxlength="60" placeholder="Source (ex. PO du 15/11, interrogatoire de …)">
+        <div class="row"><button class="btn pri sm" data-a="noteadd" data-id="${id}">${ic('plus')}Ajouter l'info</button></div></div></div>
+      <div class="panel"><h3>Journal des infos</h3>${notes ? `<div class="hist">${notes}</div>` : '<p class="hint" style="margin:0">Aucune info pour l\'instant.</p>'}</div>
+      <div class="panel"><h3>Membres connus</h3><div class="stack" style="gap:10px;margin-top:8px">${people || '<p class="hint" style="margin:0">Aucun membre identifié.</p>'}</div>
+        <div class="stack" style="gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)"><span class="field">Ajouter un membre (ex. la personne interrogée)</span>
+          <div class="row"><input class="inp" id="ps-name" maxlength="40" placeholder="Nom prénom" style="flex:1;min-width:140px"><input class="inp" id="ps-role" maxlength="30" placeholder="Rôle / grade" style="width:140px"></div>
+          <div class="row"><input class="inp" id="ps-radio" maxlength="20" placeholder="Radio" style="width:120px"><input class="inp" id="ps-notes" maxlength="200" placeholder="Infos (téléphone, véhicule…)" style="flex:1;min-width:140px"></div>
+          <div class="row"><button class="btn sm" data-a="persadd" data-id="${id}">${ic('plus')}Ajouter</button><span class="hint" style="margin:0;font-size:11.5px">La photo de sa carte d'identité s'ajoute ensuite sur sa fiche.</span></div></div></div>
+      ${(o.log || []).length ? `<div class="panel"><h3>Modifications</h3><div class="hist">${(o.log || []).slice().reverse().slice(0, 8).map(l => `<div class="hist-r"><span>${esc(l.act)}<br><small>${esc(l.by)} · ${ago(l.at)}</small></span></div>`).join('')}</div></div>` : ''}
+    </div></div>`;
+}
+VIEWS.renseignements = () => {
+  const o = orgById(S.orgSel);
+  if (o) return orgDetail(o);
+  const q = normName(S.orgQ || '');
+  const list = S.intel.filter(x => !q || normName(x.name).includes(q) || normName(x.color || '').includes(q) || (x.people || []).some(p => normName(p.name).includes(q)))
+    .sort((a, b) => ({haute:0, moyenne:1, faible:2}[a.threat] ?? 1) - ({haute:0, moyenne:1, faible:2}[b.threat] ?? 1) || (b.lastAt || 0) - (a.lastAt || 0));
+  return `<div class="toolbar" style="margin-bottom:14px"><input class="inp" id="org-new" maxlength="40" placeholder="Nom d'une organisation" style="flex:1;min-width:160px;max-width:300px"><button class="btn pri sm" data-a="orgnew">${ic('plus')}Nouvelle fiche</button>
+      <span class="spacer"></span><input class="inp" id="org-q" data-c="orgq" placeholder="Chercher (orga, couleur, membre)" value="${esc(S.orgQ || '')}" style="min-width:200px"></div>
+    ${list.length ? `<div class="orggrid">${list.map(orgCard).join('')}</div>` : `<div class="empty"><strong>${S.intel.length ? 'Aucune fiche ne correspond' : 'Aucune organisation fichée'}</strong>${S.intel.length ? '' : 'Crée une fiche après une PO, ou indique l\'organisation visée dans le bilan de la mission « PO sur Orga ».'}</div>`}`;
+};
+// Après une PO : crée la fiche de l'organisation visée si besoin et note la PO dans son journal.
+async function intelFromPO(op){
+  const name = (op.targetOrg || '').trim(); if (!name || !me()) return;
+  const o = orgByName(name) || newOrg(name);
+  const d = Object.assign({}, o, {notes:(o.notes || []).concat([{id:uid('n'), at:Date.now(), by:me().name, byId:me().id, source:'PO sur Orga', text:`PO ${op.result === 'fail' ? 'échouée' : 'réussie'} avec ${op.participants.map(p => p.name).join(', ')}`}])});
+  await saveOrg(d, orgById(o.id) ? 'PO ajoutée au journal' : 'fiche créée après une PO');
+  toast(`Fiche « ${o.name} » mise à jour : ajoute les infos dans Renseignements.`);
+}
+// Lightbox + collage d'images
+function openLightbox(src){ let lb = $('#lightbox'); if (!lb) { lb = document.createElement('div'); lb.id = 'lightbox'; lb.className = 'ov lb'; document.body.appendChild(lb); }
+  lb.innerHTML = `<button class="btn sm lbx" data-a="lbclose">${ic('x')}Fermer</button><img src="${src}" alt="Photo agrandie">`; lb.hidden = false; }
+document.addEventListener('change', e => { const t = e.target; if (t.dataset && t.dataset.imgSlot && t.files && t.files[0]) { uploadIntelImg(t.dataset.imgSlot, t.files[0]); t.value = ''; } });
+document.addEventListener('paste', e => {
+  if (S.view !== 'renseignements' || !S.pasteSlot) return;
+  const f = Array.from((e.clipboardData || {}).items || []).map(i => i.kind === 'file' ? i.getAsFile() : null).find(x => x && /^image\//.test(x.type));
+  if (!f) { toast("Le presse-papiers ne contient pas d'image."); return; }
+  e.preventDefault(); const slot = S.pasteSlot; S.pasteSlot = null; uploadIntelImg(slot, f);
+});
+document.addEventListener('dragover', e => { const z = e.target.closest && e.target.closest('[data-drop-img]'); if (z) { e.preventDefault(); z.classList.add('armed'); } });
+document.addEventListener('drop', e => { const z = e.target.closest && e.target.closest('[data-drop-img]'); if (!z) return; e.preventDefault();
+  const f = Array.from((e.dataTransfer || {}).files || []).find(x => /^image\//.test(x.type)); if (f) uploadIntelImg(z.dataset.dropImg, f); });
+
 /* ---------- Actions ---------- */
 const A = {
   logout(){ logout(); },
@@ -1921,6 +2112,27 @@ const A = {
     Store.write('sanctions/' + sx.id, d).then(ok => { if (ok) toast('Sanction annulée.'); }); render(); },
   ctab(t){ S.coffreTab = t.dataset.t; render(); },
   labtab(t){ S.labTab = t.dataset.t; render(); },
+  orgnew(){ if (!me()) return; const i = $('#org-new'); const name = ((i && i.value) || '').trim().slice(0, 40); if (!name) { toast("Indique le nom de l'organisation."); if (i) i.focus(); return; }
+    const ex = orgByName(name); if (ex) { S.orgSel = ex.id; render(); return; } const o = newOrg(name); S.orgSel = o.id; saveOrg(o, 'fiche créée'); window.scrollTo({top:0}); },
+  orgopen(t){ S.orgSel = t.dataset.id; S.confirm = null; S.pasteSlot = null; render(); window.scrollTo({top:0}); },
+  orgback(){ S.orgSel = null; S.pasteSlot = null; render(); },
+  orgsave(t){ const o = orgById(t.dataset.id); if (!o || !me()) return; const v = s2 => (($(s2) || {}).value || '').trim();
+    const d = Object.assign({}, o, {name: v('#og-name').slice(0, 40) || o.name, threat: v('#og-threat') || o.threat, color: v('#og-color'), colorHex: v('#og-hex'), claims: v('#og-claims'), radio: v('#og-radio'),
+      villa: Object.assign({}, o.villa || {}, {desc: v('#og-villa')}), boss: Object.assign({}, o.boss || {}, {name: v('#og-bossname'), notes: v('#og-bossnotes')})});
+    saveOrg(d, 'fiche modifiée').then(ok => { if (ok) toast('Fiche enregistrée.'); }); },
+  orgdel(t){ const o = orgById(t.dataset.id); S.confirm = null; if (!o || !isExec()) return; S.orgSel = null; S.intel = S.intel.filter(x => x !== o);
+    const d = Object.assign({}, o, {_del:true, lastById:me().id, lastAt:Date.now()}); delete d.id; Store.write('intel/' + o.id, d).then(ok => { if (ok) toast('Fiche supprimée.'); }); render(); },
+  noteadd(t){ const o = orgById(t.dataset.id); if (!o || !me()) return; const text = (($('#nt-text') || {}).value || '').trim().slice(0, 500); if (!text) { toast("Écris l'info à ajouter."); return; }
+    const source = (($('#nt-source') || {}).value || '').trim().slice(0, 60);
+    saveOrg(Object.assign({}, o, {notes:(o.notes || []).concat([{id:uid('n'), at:Date.now(), by:me().name, byId:me().id, text, source}])}), 'info ajoutée').then(ok => { if (ok) toast('Info ajoutée.'); }); },
+  notedel(t){ const o = orgById(t.dataset.id); if (!o) return; saveOrg(Object.assign({}, o, {notes:(o.notes || []).filter(n => n.id !== t.dataset.n)}), 'info supprimée'); },
+  persadd(t){ const o = orgById(t.dataset.id); if (!o || !me()) return; const v = s2 => (($(s2) || {}).value || '').trim();
+    const name = v('#ps-name').slice(0, 40); if (!name) { toast('Indique le nom prénom.'); return; }
+    saveOrg(Object.assign({}, o, {people:(o.people || []).concat([{id:uid('p'), name, role:v('#ps-role').slice(0, 30), radio:v('#ps-radio').slice(0, 20), notes:v('#ps-notes').slice(0, 200), imgId:'', at:Date.now(), by:me().name, byId:me().id}])}), `membre ajouté : ${name}`).then(ok => { if (ok) toast(`${name} ajouté. Ajoute la photo de sa carte d'identité.`); }); },
+  persdel(t){ const o = orgById(t.dataset.id); if (!o) return; const p = (o.people || []).find(x => x.id === t.dataset.p); saveOrg(Object.assign({}, o, {people:(o.people || []).filter(x => x.id !== t.dataset.p)}), `membre retiré : ${p ? p.name : ''}`); },
+  armpaste(t){ S.pasteSlot = S.pasteSlot === t.dataset.slot ? null : t.dataset.slot; render(); if (S.pasteSlot) toast("Fais maintenant Ctrl+V pour coller ta capture d'écran."); },
+  imgview(t){ const src = imgCache[t.dataset.id]; if (src && src !== 'none') openLightbox(src); },
+  lbclose(){ const lb = $('#lightbox'); if (lb) lb.hidden = true; },
   lnew(t){ if (!me()) return; S.lw = newLabWiz(t.dataset.k); renderLabWiz(); },
   lclose(){ S.lw = null; renderLabWiz(); },
   lstep(t){ const w = S.lw; if (!w) return; const to = Number(t.dataset.to);
@@ -2003,6 +2215,7 @@ const A = {
     S.wiz = null; S.sel = null; S.confirm = null; renderWiz();
     location.hash = 'bilans'; S.view = 'bilans'; S.period = 'week'; render();
     copy(discordText(op), null);
+    if ((MBY[op.missionId] || {}).intel && op.targetOrg) intelFromPO(op);
   },
   wcancel(){ clearTimeout(wizSaveT); const id = S.wiz.id; S.live = S.live.filter(l => l.id !== id); Store.write('live/' + id, null); S.wiz = null; S.sel = null; S.confirm = null; renderWiz(); render(); toast('OP annulée.'); },
   period(t){ S.period = t.dataset.p; render(); },
@@ -2062,12 +2275,16 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.id === 'sx-reason') { e.preventDefault(); A.sanction(); }
   if (e.key === 'Enter' && e.target.id === 'ia-name') { e.preventDefault(); A.invadd(); }
   if (e.key === 'Enter' && e.target.id === 'lguest-in') { e.preventDefault(); A.lguest(); }
+  if (e.key === 'Enter' && e.target.id === 'org-new') { e.preventDefault(); A.orgnew(); }
+  if (e.key === 'Escape') A.lbclose();
 });
 document.addEventListener('toggle', e => { const d = e.target; if (d && d.dataset && d.dataset.edit) S.labEdit = d.open ? d.dataset.edit : (S.labEdit === d.dataset.edit ? null : S.labEdit); }, true);
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.c === 'invq') { S.invQ = t.value; const g = $('#inv-grid'); if (g) g.innerHTML = gridHtml(); return; }
   if (t.dataset.c === 'sxreason') { S.sxReason = t.value; return; }
+  if (t.dataset.c === 'tgt' && S.wiz) { S.wiz.targetOrg = t.value; saveWiz(); const d = $('#disc'); if (d) d.textContent = discordText(opFromWiz(S.wiz)); return; }
+  if (t.dataset.c === 'orgq') { S.orgQ = t.value; render(); const i = $('#org-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } return; }
   if (S.lw && ['lprod','lpoch','lsrcq','lextra','lshare','lmoney'].includes(t.dataset.c)) { const w = S.lw, c = t.dataset.c;
     if (c === 'lprod') w.product = t.value; if (c === 'lpoch') w.pochons = t.value.replace(/\D/g, ''); if (c === 'lextra') w.extra = t.value;
     if (c === 'lsrcq') w.sources[t.dataset.id] = t.value; if (c === 'lshare') w.shares[t.dataset.n] = t.value; if (c === 'lmoney') w.money[t.dataset.n] = t.value;
@@ -2122,7 +2339,7 @@ route();
 let slowT;
 function connect(){
   Store.stopAll();
-  Object.assign(S, {config:null, cfgLoaded:false, ops:[], live:[], coffre:[], forms:[], mdocs:[], vault:{}, vaultOn:false, sanctions:[], inv:[], invlog:[], labs:[], syncErr:false, slow:false, v3:undefined});
+  Object.assign(S, {config:null, cfgLoaded:false, ops:[], live:[], coffre:[], forms:[], mdocs:[], vault:{}, vaultOn:false, sanctions:[], inv:[], invlog:[], labs:[], intel:[], syncErr:false, slow:false, v3:undefined});
   clearTimeout(slowT); slowT = setTimeout(() => { if (!Store.synced) { S.slow = true; renderSync(); } }, 10000);
   Store.watchDoc('crew/config', d => { S.config = d; S.cfgLoaded = true; scheduleRender(); });
   Store.watchDoc('crew/v3', d => { S.v3 = !!d; checkSec(); });
@@ -2141,6 +2358,7 @@ function connect(){
   Store.watchColl('sanctions', l => { S.sanctions = l; scheduleRender(); });
   Store.watchColl('inv', l => { S.inv = l; scheduleRender(); });
   Store.watchColl('labs', l => { S.labs = l; scheduleRender(); });
+  Store.watchColl('intel', l => { S.intel = l; scheduleRender(); });
   Store.watchColl('invlog', l => { S.invlog = l; scheduleRender(); }, {order:'at', dir:'desc', limit:40});
   renderSync(); render();
 }

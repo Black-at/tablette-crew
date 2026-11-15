@@ -104,6 +104,11 @@ service cloud.firestore {
       let d = request.resource.data;
       return L >= 1 && d.lastById == myId(c) && d.recipe is string && (d.get('_del', false) == false || (upd && L >= 2));
     }
+    function trackedWrite(c) {
+      let L = lvl(c);
+      let d = request.resource.data;
+      return L >= 1 && d.lastById == myId(c) && (d.get('_del', false) == false || L >= 2);
+    }
     function vaultWrite(c, vs) {
       let L = lvl(c);
       return L == 4 && (kdoc(c).get('vault', '') == vs || !exists(/databases/$(database)/documents/crews/$(c)/crew/v3));
@@ -197,6 +202,18 @@ service cloud.firestore {
         allow read: if okCode(c);
         allow create: if labWrite(c, false);
         allow update: if labWrite(c, true);
+        allow delete: if false;
+      }
+      // Renseignements : tout membre complète les fiches ; seuls les Exécutants et plus suppriment une fiche ou une photo.
+      match /intel/{id} {
+        allow read: if okCode(c);
+        allow create, update: if trackedWrite(c);
+        allow delete: if false;
+      }
+      match /intelimg/{id} {
+        allow read: if okCode(c);
+        allow create: if lvl(c) >= 1 && request.resource.data.byId == myId(c) && request.resource.data.data is string;
+        allow update: if lvl(c) >= 2;
         allow delete: if false;
       }
       match /invlog/{id} {
