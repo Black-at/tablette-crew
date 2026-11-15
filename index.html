@@ -388,6 +388,13 @@ details.edit summary{cursor:pointer;font-size:12.5px;color:var(--accent-hi)}
 .fridge.ready{background:var(--ok-soft);border-color:rgba(63,185,80,.4)}
 .fridge.ready .lbl,.fridge.ready b{color:#7ee08b}
 .fridge.ready .fbar i{background:var(--ok)}
+
+.srcrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 12px;border-radius:5px;background:var(--card);border:1px solid var(--line)}
+.srcrow.on{border-color:var(--accent-line)}
+.srcrow .meta{font-size:12.5px;color:var(--muted)}
+.sellrow{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;padding:12px 14px;border-radius:5px;background:var(--card);border:1px solid var(--line);border-left:3px solid var(--ok)}
+.sellrow > b{min-width:90px;align-self:center;font-size:14px}
+.opc.rec .bar{background:var(--p-neg)}
 @media (max-width:900px){
   .app{grid-template-columns:minmax(0,1fr)}
   .side{min-width:0;position:relative;top:0;max-height:none;border-right:0;border-bottom:1px solid var(--line);padding:18px 16px;gap:14px}
@@ -548,7 +555,7 @@ const NAV = [
   {id:'missions', label:'Missions', icon:'swords', title:'Missions', sub:'Lancez des braquages et opérations pour faire progresser votre crew.'},
   {id:'bilans', label:"Bilan d'activité", icon:'scroll', title:"Bilan d'activité", sub:'Historique des OP, gains et participation de chaque membre.'},
   {id:'coffre', label:'Coffre', icon:'box', title:'Coffre', sub:'Ce qu\'il y a dans le coffre de la villa, et qui le remplit cette semaine.'},
-  {id:'labos', label:'Laboratoires', icon:'flask', title:'Laboratoires', sub:'Synthèse : cuve, réfrigérateur, pochons. Les cultures arrivent bientôt.'},
+  {id:'labos', label:'Laboratoires', icon:'flask', title:'Laboratoires', sub:'Récoltes de pochons, ventes et coffre du labo.'},
   {id:'formations', label:'Formations', icon:'grad', title:'Formations', sub:'Négociateur, surveillance des otages, braquage : prends ta formation.'},
   {id:'membres', label:'Membres', icon:'users', title:'Membres', sub:'La hiérarchie du crew et le parcours de chaque membre.'},
   {id:'sanctions', label:'Sanctions', icon:'alert', title:'Sanctions', sub:"Rappels à l'ordre et avertissements. 2 avertissements = viré."},
@@ -670,7 +677,7 @@ const S = {
   view: 'missions', meId: LS.get('crew-me', null),
   config: null, cfgLoaded:false, ops: [], live: [], coffre: [], forms: [],
   wiz: null, sel: null, confirm: null, period: 'week', spinning: false, pending: false,
-  wheelRot: 0, idOpen: false, syncErr:false, slow:false, mdocs: [], vault: {}, reveal: {}, loginOpen: false, secOpen: false, myKey: null, labs: [], labTab: 'synthese', labN: 1, labSite: null, labSub: 'prod', labEdit: null, invPlace: 'villa', invSeed: null, sanctions: [], sxType: 'avert', sxMember: '', sxReason: '', inv: [], invlog: [], invCat: 'all', invQ: '', invSel: null, mvN: 1, coffreTab: 'inv', vaultOn: false
+  wheelRot: 0, idOpen: false, syncErr:false, slow:false, mdocs: [], vault: {}, reveal: {}, loginOpen: false, secOpen: false, myKey: null, lw: null, labs: [], labTab: 'synthese', labN: 1, labSite: null, labSub: 'prod', labEdit: null, invPlace: 'villa', invSeed: null, sanctions: [], sxType: 'avert', sxMember: '', sxReason: '', inv: [], invlog: [], invCat: 'all', invQ: '', invSel: null, mvN: 1, coffreTab: 'inv', vaultOn: false
 };
 const cfg = () => Object.assign({crewName:'Crew', crewLevel:1, members:[], coffreItems:DEFAULT_ITEMS, coffreExclude:[], coffreExcludeLast:true}, S.config || {});
 const members = () => S.mdocs.filter(m => !m.removed);
@@ -1008,10 +1015,14 @@ function opCard(o){
 VIEWS.bilans = () => {
   const ops = S.ops.filter(o => inPeriod(o.endedAt)).sort((a,b) => b.endedAt - a.endedAt);
   const ok = ops.filter(o => o.result !== 'fail');
-  const total = ok.reduce((s,o) => s + (o.total||0), 0);
+  const lrecs = S.labs.filter(x => x.kind && inPeriod(x.at));
+  const total = ok.reduce((s,o) => s + (o.total||0), 0) + lrecs.filter(x => x.kind === 'vente').reduce((s, v) => s + (v.total || 0), 0);
   const best = ok.slice().sort((a,b) => b.total - a.total)[0];
   const people = {};
   ops.forEach(o => { const n = (o.participants||[]).length; (o.participants||[]).forEach(p => { const r = people[p.name] || (people[p.name] = {n:0, gain:0}); r.n++; if (o.result!=='fail' && n) r.gain += o.total/n; }); });
+  const pr = name => people[name] || (people[name] = {n:0, gain:0});
+  lrecs.forEach(x => { if (x.kind === 'recolte') (x.people || []).forEach(n => pr(n).n++); else (x.sellers || []).forEach(sl => { const r = pr(sl.name); r.n++; r.gain += sl.money || 0; }); });
+  const feed = ops.map(o => ({t:o.endedAt, h:opCard(o)})).concat(lrecs.map(x => ({t:x.at, h:labRecCard(x)}))).sort((a, b) => b.t - a.t);
   const lb = Object.entries(people).sort((a,b) => b[1].n - a[1].n || b[1].gain - a[1].gain);
   const max = lb.length ? lb[0][1].n : 1;
   const plabel = {week:'cette semaine', month:'ce mois-ci', all:'depuis le début'}[S.period];
@@ -1020,13 +1031,13 @@ VIEWS.bilans = () => {
     <div class="kpis">
       <div class="kpi"><small>Total gagné</small><b>${money(total)} $</b><span>${plabel}</span></div>
       <div class="kpi"><small>OP réussies</small><b>${ok.length}<span style="font-size:14px"> / ${ops.length}</span></b><span>${ops.length - ok.length} échouée${ops.length-ok.length>1?'s':''}</span></div>
-      <div class="kpi"><small>Membres actifs</small><b>${lb.length}</b><span>au moins une OP ${plabel}</span></div>
+      <div class="kpi"><small>Membres actifs</small><b>${lb.length}</b><span>au moins une activité ${plabel}</span></div>
       <div class="kpi"><small>Meilleure OP</small><b style="font-size:16px">${best ? esc(best.missionName) : '—'}</b><span>${best ? money(best.total)+' $' : 'Aucune OP réussie'}</span></div>
     </div>
     <div class="cols">
-      <div class="stack">${ops.length ? ops.map(opCard).join('') : `<div class="empty"><strong>Aucun bilan ${plabel}</strong>Lance une mission depuis l'onglet Missions : le bilan arrive ici dès que tu l'enregistres.</div>`}</div>
-      <div class="panel"><h3>Classement participation</h3><p class="hint">Nombre d'OP ${plabel} et part estimée des gains.</p>
-        ${lb.length ? `<div class="lb">${lb.map(([n,r],i) => `<div class="lb-r"><span class="rk">${i+1}</span><span class="nm"><span>${esc(n)}</span><span class="track"><i style="width:${Math.max(4, r.n/max*100)}%"></i></span></span><span class="v">${r.n} OP<small>${money(r.gain)} $</small></span></div>`).join('')}</div>` : '<div class="empty">Personne pour l\'instant.</div>'}
+      <div class="stack">${feed.length ? feed.map(x => x.h).join('') : `<div class="empty"><strong>Aucun bilan ${plabel}</strong>Lance une mission (onglet Missions) ou enregistre une récolte ou une vente (onglet Laboratoires).</div>`}</div>
+      <div class="panel"><h3>Classement participation</h3><p class="hint">Activités ${plabel} (OP, récoltes, ventes) et gains estimés.</p>
+        ${lb.length ? `<div class="lb">${lb.map(([n,r],i) => `<div class="lb-r"><span class="rk">${i+1}</span><span class="nm"><span>${esc(n)}</span><span class="track"><i style="width:${Math.max(4, r.n/max*100)}%"></i></span></span><span class="v">${r.n} act.<small>${money(r.gain)} $</small></span></div>`).join('')}</div>` : '<div class="empty">Personne pour l\'instant.</div>'}
       </div>
     </div>`;
 };
@@ -1640,241 +1651,192 @@ const LAB_SEED = [
   ['Pochon de fentanyl','labo',20,0.2],['Méthylamine','labo',100,0.25],['Cisaille','divers',1,3],['JerryCan','divers',1,2],['Course blanche','vet',1,0.5]
 ];
 
-/* ---------- Laboratoires ---------- */
-// Recette par défaut ; les Exécutants et plus peuvent la corriger (onglet Réglages), elle est alors enregistrée dans config.recipes.
-const RECIPES = {
-  fentanyl: {id:'fentanyl', name:'Fentanyl', type:'synthese',
-    inputs:[{name:'Acide', qty:10}, {name:'Catalyseur', qty:10}, {name:'Base opioïde', qty:10}, {name:'Solvant', qty:20}],
-    plates:10, fridgeMin:16, output:{name:'Pochon de fentanyl', qty:20}}
-};
-function recipe(id){
-  const base = RECIPES[id]; if (!base) return null;
-  const o = (cfg().recipes || {})[id]; if (!o) return base;
-  return Object.assign({}, base, o, {inputs: base.inputs.map((i, k) => Object.assign({}, i, (o.inputs || [])[k] || {})), output: Object.assign({}, base.output, o.output || {})});
+/* ---------- Laboratoires : récoltes et ventes ---------- */
+// Une récolte = des pochons créés par les présents. Une vente = des pochons pris dans le stock des récoltes,
+// répartis entre les vendeurs, avec l'argent gagné par chacun. Les créateurs sont notés dans le bilan de la vente.
+const PRODUCTS = ['Fentanyl'];
+const labRecs = kind => S.labs.filter(x => x.kind === kind);
+const soldFrom = id => labRecs('vente').reduce((s, v) => s + (v.sources || []).filter(x => x.id === id).reduce((a, x) => a + (x.qty || 0), 0), 0);
+const remainingOf = r => Math.max(0, (r.pochons || 0) - soldFrom(r.id));
+const stockList = () => labRecs('recolte').map(r => Object.assign({}, r, {left: remainingOf(r)})).filter(r => r.left > 0).sort((a, b) => a.at - b.at);
+const list2 = a => a.length ? a.join(', ') : '—';
+function recolteText(r){
+  return [`# 🧪 Récolte de ${String(r.product || 'Fentanyl').toLowerCase()}`, '', `Détail : ${list2(r.people || [])}`, `Pochons créés = ${fmtQty(r.pochons)}`].join('\n');
 }
-const labSites = () => cfg().labSites || [];
-const siteOf = b => labSites().find(x => x.id === b.site) || (!b.site ? labSites()[0] : null);
-const curSite = () => labSites().find(x => x.id === S.labSite) || labSites()[0] || null;
-const sitePlace = s => 'lab:' + s.id;
-const normName = x => String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/s$/, '').trim();
-const invByName = (name, place) => S.inv.find(x => placeOf(x) === (place || 'villa') && normName(x.name) === normName(name));
-const possibleBatches = (r, place) => Math.min(...r.inputs.map(i => { const it = invByName(i.name, place); return it ? Math.floor((it.qty || 0) / i.qty) : 0; }));
-const mmss = ms => { const t = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
-const fridgeEnd = b => (b.fridgeAt || 0) + (b.fridgeMin || (recipe(b.recipe) || {}).fridgeMin || 16) * 60000;
-const LAB_STEPS = [{id:'cuve', label:'Cuve'}, {id:'frigo', label:'Réfrigérateur'}, {id:'fini', label:'Pochons'}];
-const STEP_LABEL = {cuve:'cuve', frigo:'frigo', fini:'pochons', corr:'correction'};
-
-// Mouvement dans un coffre (crée l'objet s'il n'existe pas).
-async function invAdjust(name, delta, cat, icon, note, place){
-  if (!me() || !delta) return false;
-  const at = Date.now();
-  let it = invByName(name, place);
-  if (!it) {
-    if (delta < 0) return false;
-    const id = newInvId(name);
-    const d = invNewDoc(name, cat || 'labo', delta, 0, place, icon);
-    it = Object.assign({}, d, {id}); S.inv.push(it);
-    const ok = await Store.write('inv/' + id, d);
-    if (ok) invLog(it, delta, at, note);
-    return ok;
+function venteText(v){
+  const sellers = v.sellers || [];
+  const L = [`# 💵 Vente de ${String(v.product || 'Fentanyl').toLowerCase()}`, '', `Détail : ${list2(sellers.map(s => s.name))}`,
+    `Créés par : ${list2(v.creators || [])}`, `Pochons vendus = ${fmtQty(v.pochons)}`];
+  if (sellers.length > 1) { L.push('', 'Vendeurs :'); sellers.forEach(s => L.push(`• ${s.name} : ${fmtQty(s.pochons)} pochons · ${money(s.money)} $`)); L.push(''); }
+  L.push(`Total gagné = ${money(v.total)} $`);
+  return L.join('\n');
+}
+// ----- Assistant (même principe que les missions) -----
+function newLabWiz(kind){
+  return {kind, step:0, people:[], product:'Fentanyl', pochons:'', sources:{}, extra:'', shares:{}, money:{}, editId:null};
+}
+function lwSources(w){ // [{id, qty, people}]
+  const out = [];
+  Object.entries(w.sources).forEach(([id, q]) => { const r = S.labs.find(x => x.id === id); const qty = parseInt(q, 10) || 0; if (r && qty > 0) out.push({id, qty, people: r.people || []}); });
+  return out;
+}
+function lwPochons(w){ return w.kind === 'recolte' ? (parseInt(w.pochons, 10) || 0) : lwSources(w).reduce((s, x) => s + x.qty, 0) + (parseInt(w.extra, 10) || 0); }
+function lwSplit(w){ // répartition égale des pochons entre vendeurs
+  const n = w.people.length, tot = lwPochons(w); w.shares = {};
+  w.people.forEach((p, i) => { w.shares[p] = Math.floor(tot / n) + (i < tot % n ? 1 : 0); });
+}
+function lwRecord(w){
+  const base = {kind:w.kind, recipe:slug(w.product || 'fentanyl'), product:(w.product || 'Fentanyl').trim() || 'Fentanyl'};
+  if (w.kind === 'recolte') return Object.assign(base, {people:w.people.slice(), pochons:lwPochons(w)});
+  const sources = lwSources(w);
+  const creators = [...new Set(sources.flatMap(s => s.people))];
+  const sellers = w.people.map(p => ({name:p, pochons:parseInt(w.shares[p], 10) || 0, money:parseMoney(w.money[p])}));
+  return Object.assign(base, {sources, extra:parseInt(w.extra, 10) || 0, creators, sellers, pochons:lwPochons(w), total:sellers.reduce((s, x) => s + x.money, 0)});
+}
+const LW_STEPS = {recolte:['Présents', 'Pochons créés'], vente:['Pochons vendus', 'Vendeurs', 'Argent gagné']};
+function lwTeam(w, label){
+  const ms = members();
+  const groups = GRADES.map(g => { const l = ms.filter(x => x.grade === g); if (!l.length) return '';
+    return `<div class="grp" style="--gc:${GCOL[g]}"><h5>${esc(GLABEL[g]||g)}</h5><div class="chips">${l.map(x => { const on = w.people.includes(x.name);
+      return `<button class="mchip" data-a="lptoggle" data-n="${esc(x.name)}" aria-pressed="${on}"><span class="ck">${on?ic('check'):''}</span>${esc(x.name)}</button>`; }).join('')}</div></div>`; }).join('');
+  const guests = w.people.filter(p => !byName(p));
+  return `<div class="toolbar"><span class="lbl"><b class="num">${w.people.length}</b> ${label}</span><span class="spacer"></span><button class="btn sm" data-a="lpnone">Vider</button></div>
+    <div class="grps">${groups}</div>
+    <div class="grp"><h5>Renforts / invités</h5>
+      <div class="row"><input class="inp" id="lguest-in" placeholder="Nom d'un renfort" maxlength="30" style="flex:1;max-width:320px"><button class="btn sm" data-a="lguest">${ic('plus')}Ajouter</button></div>
+      ${guests.length ? `<div class="chips" style="margin-top:10px">${guests.map(g => `<button class="mchip" aria-pressed="true" data-a="lptoggle" data-n="${esc(g)}"><span class="ck">${ic('check')}</span>${esc(g)}</button>`).join('')}</div>` : ''}</div>`;
+}
+function lwBody(w){
+  if (w.kind === 'recolte') {
+    if (w.step === 0) return lwTeam(w, `présent${w.people.length > 1 ? 's' : ''} pour créer les pochons`);
+    return `<div class="cols"><div class="stack">
+        <label class="field" for="lw-prod">Produit<input class="inp" id="lw-prod" data-c="lprod" list="lw-prods" value="${esc(w.product)}" maxlength="30"><datalist id="lw-prods">${PRODUCTS.map(p => `<option value="${p}">`).join('')}</datalist></label>
+        <label class="field" for="lw-poch">Nombre total de pochons créés<input class="inp money" id="lw-poch" data-c="lpoch" inputmode="numeric" placeholder="44" value="${esc(w.pochons)}"></label>
+        <div class="kpi"><small>Créés par</small><b style="font-size:15px">${esc(list2(w.people))}</b><span>${w.people.length} personne${w.people.length > 1 ? 's' : ''}</span></div>
+      </div><div class="stack"><div class="row"><span class="field" style="flex:1">Message pour #bilan-activité</span><button class="btn sm" data-a="lcopywiz">${ic('copy')}Copier pour Discord</button></div><pre class="disc" id="ldisc">${esc(recolteText(lwRecord(w)))}</pre></div></div>`;
   }
-  if ((it.qty || 0) + delta < 0) return false;
-  it.qty = (it.qty || 0) + delta;
-  const ok = await Store.incr('inv/' + it.id, delta, {at, by:me().name, byId:me().id});
-  if (ok) invLog(it, delta, at, note);
-  return ok;
-}
-function labStepper(b){
-  const idx = {cuve:0, frigo:1, fini:2}[b.status];
-  return `<ol class="lsteps">${LAB_STEPS.map((st, i) => `<li class="${i < idx || b.status === 'fini' ? 'done' : i === idx ? 'cur' : ''}"><b>${i < idx || b.status === 'fini' ? ic('check') : i + 1}</b>${st.label}</li>`).join('')}</ol>`;
-}
-function batchFixForm(b, r){
-  const id = esc(b.id); const left = Math.max(0, Math.ceil((fridgeEnd(b) - Date.now()) / 60000));
-  return `<details class="edit" data-edit="${esc(b.id)}" ${S.labEdit === b.id ? 'open' : ''}><summary>Corriger cette production</summary><div class="stack" style="gap:8px;margin-top:10px">
-    <div class="row"><label class="field" style="flex:1;min-width:130px">Labo<select class="inp" id="be-site-${id}">${labSites().map(s => `<option value="${esc(s.id)}" ${siteOf(b) && siteOf(b).id === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
-      <label class="field" style="flex:1;min-width:130px">Étape<select class="inp" id="be-st-${id}">${LAB_STEPS.map(st => `<option value="${st.id}" ${st.id === b.status ? 'selected' : ''}>${st.label}</option>`).join('')}</select></label></div>
-    <div class="row"><label class="field" style="flex:1">Minutes restantes au frigo<input class="inp num" id="be-min-${id}" type="number" min="0" max="240" value="${b.status === 'frigo' ? left : r.fridgeMin}"></label>
-      <label class="field" style="flex:1">Pochons obtenus<input class="inp num" id="be-po-${id}" type="number" min="0" value="${b.pochons != null ? b.pochons : r.output.qty}"></label></div>
-    <p class="hint" style="margin:0">Corriger ne change pas le coffre : ajuste-le à la main si besoin (onglet Coffre du labo).</p>
-    <div class="row"><button class="btn pri sm" data-a="labfix" data-id="${id}">Enregistrer la correction</button></div>
-  </div></details>`;
-}
-function batchCard(b){
-  const r = recipe(b.recipe); if (!r) return '';
-  const k = 'labdel:' + b.id; const now = Date.now(); const site = siteOf(b);
-  let body = '', act = '';
-  if (b.status === 'cuve') {
-    body = `<p>Les ingrédients sont dans la cuve. Extrais les <b>${r.plates} plaquettes</b> et mets-les au réfrigérateur.</p>`;
-    act = `<button class="btn pri" data-a="labnext" data-id="${esc(b.id)}">${ic('right')}Extraire et mettre au frigo</button>`;
-  } else if (b.status === 'frigo') {
-    const left = fridgeEnd(b) - now; const ready = left <= 0; const len = (b.fridgeMin || r.fridgeMin) * 60000;
-    body = `<div class="fridge ${ready ? 'ready' : ''}"><span class="lbl">${ready ? 'Plaquettes prêtes' : 'Au réfrigérateur'}</span><b class="num" data-until="${fridgeEnd(b)}">${ready ? 'Prêt' : mmss(left)}</b>
-      <span class="fbar"><i data-bar="${fridgeEnd(b)}" data-len="${len}" style="width:${Math.min(100, Math.max(0, 100 - left / len * 100))}%"></i></span></div>
-      <p>Ensuite : casser les ${r.plates} plaquettes et les mettre en <b>${r.output.qty} pochons</b>.</p>`;
-    act = ready || S.confirm === 'early:' + b.id
-      ? `<label class="check"><input type="checkbox" id="tocoffre-${esc(b.id)}" checked>Ranger les ${r.output.qty} pochons dans le coffre du labo</label><button class="btn ${ready ? 'ok' : 'red'}" data-a="labnext" data-id="${esc(b.id)}">${ic('check')}${ready ? 'Casser et mettre en pochons' : 'Confirmer : sortir avant la fin'}</button>`
-      : `<button class="btn" disabled>Casser et mettre en pochons</button><button class="btn ghost sm" data-a="askconfirm" data-k="early:${esc(b.id)}">Déjà fini en jeu ?</button>`;
-  } else {
-    body = `<p>Terminée ${fmtDT(b.doneAt)} : <b>${fmtQty(b.pochons != null ? b.pochons : r.output.qty)} pochons</b>${b.toCoffre ? ' rangés au coffre du labo' : ''}.</p>`;
-    act = `<button class="btn sm" data-a="labeditclose">Fermer</button>`;
+  if (w.step === 0) {
+    const st = stockList().concat(w.editId ? S.labs.filter(r => r.kind === 'recolte' && w.sources[r.id] && !stockList().some(x => x.id === r.id)).map(r => Object.assign({}, r, {left:0})) : []);
+    const editBack = id => { const v = w.editId && S.labs.find(x => x.id === w.editId); return v ? ((v.sources || []).find(x => x.id === id) || {}).qty || 0 : 0; };
+    return `<p class="hint" style="margin:0">Coche les récoltes d'où viennent les pochons vendus. Ceux qui les ont créés seront notés dans le bilan de la vente.</p>
+      ${st.length ? `<div class="stack" style="gap:8px">${st.map(r => { const max = r.left + editBack(r.id); const on = w.sources[r.id] != null;
+        return `<div class="srcrow ${on ? 'on' : ''}"><button class="mchip" data-a="lsrc" data-id="${esc(r.id)}" aria-pressed="${on}"><span class="ck">${on ? ic('check') : ''}</span>${fmtQty(max)} pochons</button>
+          <span class="meta">${esc(r.product || 'Fentanyl')} · créés par <b>${esc(list2(r.people || []))}</b> · ${fmtD(r.at)}</span><span class="spacer"></span>
+          ${on ? `<label class="field" style="flex-direction:row;align-items:center;gap:8px">Vendus<input class="inp num" data-c="lsrcq" data-id="${esc(r.id)}" type="number" min="1" max="${max}" value="${esc(w.sources[r.id])}" style="width:90px"></label>` : ''}</div>`; }).join('')}</div>`
+        : `<div class="empty"><strong>Aucun pochon en stock</strong>Enregistre d'abord une récolte, ou indique des pochons hors stock ci-dessous.</div>`}
+      <label class="field" for="lw-extra" style="max-width:320px">Autres pochons (pas dans le stock)<input class="inp num" id="lw-extra" data-c="lextra" type="number" min="0" value="${esc(w.extra)}" placeholder="0"></label>
+      <div class="toolbar"><span class="lbl">Total vendu : <b class="num" id="lw-tot">${fmtQty(lwPochons(w))}</b> pochons</span></div>`;
   }
-  const who = (b.log || []).map(l => `${esc(l.by)} (${STEP_LABEL[l.step] || l.step})`).join(' · ');
-  return `<article class="batch ${b.status}">
-    <div class="row"><span class="fi" style="--pc:var(--p-neg)">${ic('flask')}</span><div style="min-width:0"><h4>${esc(r.name)} · ${esc(site ? site.name : (b.lab || 'Labo'))}</h4><span class="meta">Lancée par ${esc(b.by)} · ${ago(b.startedAt)}</span></div><span class="spacer"></span>
-      ${isExec() ? (S.confirm === k ? `<button class="btn red sm" data-a="labdel" data-id="${esc(b.id)}">Supprimer</button><button class="btn sm" data-a="noconfirm">Non</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}" aria-label="Supprimer cette production">${ic('trash')}</button>`) : ''}</div>
-    ${labStepper(b)}${body}
-    <div class="row">${act}</div>
-    ${who ? `<p class="hint" style="margin:0;font-size:11.5px">${who}</p>` : ''}
-    ${isExec() ? batchFixForm(b, r) : ''}
-  </article>`;
+  if (w.step === 1) return lwTeam(w, `vendeur${w.people.length > 1 ? 's' : ''} présent${w.people.length > 1 ? 's' : ''}`);
+  const v = lwRecord(w);
+  return `<div class="cols"><div class="stack">
+      <div class="kpi"><small>Pochons créés par</small><b style="font-size:15px">${esc(list2(v.creators))}</b><span>${fmtQty(v.pochons)} pochons vendus</span></div>
+      ${w.people.map(p => `<div class="sellrow"><b>${esc(p)}</b>
+        <label class="field">Pochons<input class="inp num" data-c="lshare" data-n="${esc(p)}" type="number" min="0" value="${esc(w.shares[p] != null ? w.shares[p] : 0)}" style="width:90px"></label>
+        <label class="field" style="flex:1;min-width:140px">Argent gagné ($)<input class="inp num" data-c="lmoney" data-n="${esc(p)}" inputmode="numeric" placeholder="60.000" value="${esc(w.money[p] ? money(parseMoney(w.money[p])) : '')}"></label></div>`).join('')}
+      <div class="toolbar"><span class="lbl">Total gagné : <b class="num" id="lw-money">${money(v.total)} $</b></span><span class="spacer"></span><span class="lbl" id="lw-sharechk" style="color:${v.sellers.reduce((s, x) => s + x.pochons, 0) === v.pochons ? 'var(--muted)' : 'var(--warn)'}">Répartis : ${fmtQty(v.sellers.reduce((s, x) => s + x.pochons, 0))} / ${fmtQty(v.pochons)}</span></div>
+    </div><div class="stack"><div class="row"><span class="field" style="flex:1">Message pour #bilan-activité</span><button class="btn sm" data-a="lcopywiz">${ic('copy')}Copier pour Discord</button></div><pre class="disc" id="ldisc">${esc(venteText(v))}</pre></div></div>`;
 }
-function siteForm(){
-  return `<div class="panel"><h3>Ajouter un labo de synthèse</h3><div class="row" style="align-items:flex-end;margin-top:8px">
-    <label class="field" style="flex:1;min-width:150px" for="ns-name">Nom du labo<input class="inp" id="ns-name" maxlength="30" placeholder="Roxwood"></label>
-    <label class="field" for="ns-cap">Capacité du coffre (kg)<input class="inp num" id="ns-cap" type="number" min="1" value="1500" style="width:120px"></label>
-    <button class="btn pri" data-a="siteadd">${ic('plus')}Ajouter</button></div></div>`;
+function renderLabWiz(){
+  const root = $('#modal');
+  if (!S.lw) { if (!S.wiz && !S.loginOpen && !S.secOpen) root.innerHTML = ''; return; }
+  const w = S.lw; const steps = LW_STEPS[w.kind]; const last = w.step === steps.length - 1;
+  const canNext = w.kind === 'recolte' ? (w.step === 0 ? w.people.length > 0 : true) : (w.step === 0 ? lwPochons(w) > 0 : w.step === 1 ? w.people.length > 0 : true);
+  const scroll = root.querySelector('.ov') ? root.querySelector('.ov').scrollTop : 0;
+  const title = (w.editId ? 'Corriger : ' : '') + (w.kind === 'recolte' ? 'Récolte' : 'Vente');
+  root.innerHTML = `<div class="ov" role="dialog" aria-modal="true" aria-label="${title}"><div class="wiz">
+    <div class="wiz-h" style="--h:${w.kind === 'recolte' ? 270 : 140}">${art(w.kind === 'recolte' ? 'labo' : 'bank')}<div><div class="live-k"><i></i>LABORATOIRE</div><h3>${title}</h3><p>${w.kind === 'recolte' ? 'Les présents créent les pochons' : 'Les vendeurs écoulent les pochons du stock'}</p></div>
+      <button class="btn sm wiz-x" data-a="lclose">${ic('x')}Fermer</button></div>
+    <div class="steps">${steps.map((st, i) => `<button data-a="lstep" data-to="${i}" ${i === w.step ? 'aria-current="step"' : ''} class="${i < w.step ? 'done' : ''}"><b>${i < w.step ? ic('check') : i + 1}</b>${st}</button>`).join('')}</div>
+    <div class="wiz-b">${lwBody(w)}</div>
+    <div class="wiz-f"><span class="spacer"></span>
+      ${w.step > 0 ? `<button class="btn" data-a="lstep" data-to="${w.step - 1}">${ic('left')}Précédent</button>` : ''}
+      ${!last ? `<button class="btn pri" data-a="lstep" data-to="${w.step + 1}" ${canNext ? '' : 'disabled'}>Suivant${ic('right')}</button>` : `<button class="btn pri" data-a="lsave">${ic('check')}Enregistrer le bilan</button>`}
+    </div></div></div>`;
+  const ov = root.querySelector('.ov'); if (ov) ov.scrollTop = scroll;
 }
-function labProduction(site, r){
-  const place = sitePlace(site);
-  const mine = b => { const s = siteOf(b); return s && s.id === site.id; };
-  const active = S.labs.filter(b => b.status !== 'fini' && mine(b)).sort((a, b) => a.startedAt - b.startedAt);
-  const edited = S.labs.find(b => b.id === S.labEdit && b.status === 'fini');
-  const done = S.labs.filter(b => b.status === 'fini' && mine(b)).sort((a, b) => b.doneAt - a.doneAt);
-  const wk = isoWeek(new Date()).id;
-  const weekDone = done.filter(b => isoWeek(new Date(b.doneAt)).id === wk);
-  const weekPochons = weekDone.reduce((s, b) => s + (b.pochons != null ? b.pochons : r.output.qty), 0);
-  const nextOut = active.filter(b => b.status === 'frigo').map(fridgeEnd).sort((a, b) => a - b)[0];
-  const n = Math.max(1, Math.min(20, S.labN || 1));
-  const can = possibleBatches(r, place);
-  const workers = {}; S.labs.filter(mine).forEach(b => (b.log || []).forEach(l => { if (l.step !== 'corr' && isoWeek(new Date(l.at)).id === wk) workers[l.by] = (workers[l.by] || 0) + 1; }));
-  const lb = Object.entries(workers).sort((a, b) => b[1] - a[1]); const mx = lb.length ? lb[0][1] : 1;
-  const rows = r.inputs.map(i => { const it = invByName(i.name, place); const have = it ? it.qty || 0 : 0; const need = i.qty * n;
-    return `<tr><td>${esc(i.name)}</td><td class="num">${fmtQty(need)}</td><td class="num" style="color:${have >= need ? '#7ee08b' : '#ff8a8d'}">${it ? fmtQty(have) : 'absent'}</td></tr>`; }).join('');
-  const enough = can >= n;
-  return `<div class="kpis">
-      <div class="kpi"><small>Cuves en cours</small><b>${active.length}</b><span>${active.filter(b => b.status === 'frigo').length} au frigo</span></div>
-      <div class="kpi"><small>Prochaine sortie de frigo</small><b class="num" ${nextOut ? `data-until="${nextOut}"` : ''}>${nextOut ? (nextOut <= Date.now() ? 'Prêt' : mmss(nextOut - Date.now())) : '—'}</b><span>${nextOut ? 'minutes restantes' : 'rien au frigo'}</span></div>
-      <div class="kpi"><small>Pochons cette semaine</small><b>${fmtQty(weekPochons)}</b><span>${weekDone.length} cuve${weekDone.length > 1 ? 's' : ''} terminée${weekDone.length > 1 ? 's' : ''}</span></div>
-      <div class="kpi"><small>Possible avec le coffre du labo</small><b>${can}</b><span>cuve${can > 1 ? 's' : ''} de ${r.name.toLowerCase()}</span></div>
+function lwRefresh(){ // met à jour l'aperçu sans tout redessiner (garde le focus)
+  const w = S.lw; if (!w) return; const v = lwRecord(w);
+  const d = $('#ldisc'); if (d) d.textContent = w.kind === 'recolte' ? recolteText(v) : venteText(v);
+  const t = $('#lw-tot'); if (t) t.textContent = fmtQty(lwPochons(w));
+  const m = $('#lw-money'); if (m) m.textContent = money(v.total) + ' $';
+  const c = $('#lw-sharechk'); if (c && v.sellers) { const sum = v.sellers.reduce((s, x) => s + x.pochons, 0); c.textContent = `Répartis : ${fmtQty(sum)} / ${fmtQty(v.pochons)}`; c.style.color = sum === v.pochons ? 'var(--muted)' : 'var(--warn)'; }
+  const nx = document.querySelector('#modal [data-a="lstep"][data-to="1"].pri'); if (nx && w.kind === 'vente' && w.step === 0) nx.disabled = !(lwPochons(w) > 0);
+}
+async function lwSave(){
+  const w = S.lw; if (!w || !me()) return;
+  const rec = lwRecord(w);
+  if (!rec.pochons) { toast('Indique le nombre de pochons.'); return; }
+  if (w.kind === 'vente') {
+    for (const s of rec.sources) { const r = S.labs.find(x => x.id === s.id); const prev = w.editId ? (((S.labs.find(x => x.id === w.editId) || {}).sources || []).find(x => x.id === s.id) || {}).qty || 0 : 0;
+      if (r && s.qty > remainingOf(r) + prev) { toast(`Il ne reste que ${remainingOf(r) + prev} pochons dans cette récolte.`); return; } }
+    if (rec.sellers.reduce((s, x) => s + x.pochons, 0) !== rec.pochons) { toast('La répartition des pochons entre vendeurs ne fait pas le total.'); return; }
+    if (!rec.total) { toast("Indique l'argent gagné."); return; }
+  }
+  const old = w.editId ? S.labs.find(x => x.id === w.editId) : null;
+  const id = w.editId || uid(w.kind === 'recolte' ? 'rec' : 'ven');
+  const d = Object.assign({}, rec, {at: old ? old.at : Date.now(), by: old ? old.by : me().name, byId: old ? old.byId : me().id, lastById: me().id, lastAt: Date.now()});
+  if (old) d.corrected = {by: me().name, at: Date.now()};
+  const ix = S.labs.findIndex(x => x.id === id); const local = Object.assign({}, d, {id});
+  if (ix >= 0) S.labs[ix] = local; else S.labs.push(local);
+  const text = w.kind === 'recolte' ? recolteText(d) : venteText(d);
+  S.lw = null; renderLabWiz(); render();
+  const ok = await Store.write('labs/' + id, d);
+  if (ok) copy(text, null);
+}
+function labRecCard(x){
+  const isV = x.kind === 'vente'; const k = 'ldel:' + x.id;
+  const head = isV ? `<h4>Vente · ${esc(x.product || 'Fentanyl')}</h4><span class="st-pill ok">${fmtQty(x.pochons)} vendus</span>` : `<h4>Récolte · ${esc(x.product || 'Fentanyl')}</h4><span class="st-pill info">${fmtQty(x.pochons)} créés</span>`;
+  const people = isV ? (x.sellers || []).map(s => `<span class="pc" style="--pc:var(--ok)">${esc(s.name)} <small>${fmtQty(s.pochons)} · ${money(s.money)} $</small></span>`).join('') + (x.creators || []).map(n => `<span class="pc" style="--pc:var(--p-neg)">${esc(n)} <small>créateur</small></span>`).join('')
+    : (x.people || []).map(n => `<span class="pc" style="--pc:var(--p-neg)">${esc(n)}</span>`).join('');
+  const left = isV ? null : remainingOf(x);
+  return `<article class="opc ${isV ? '' : 'rec'}" style="--h:${isV ? 140 : 270}"><span class="bar"></span><div class="in">
+    <div class="op-h">${head}<span class="meta">${fmtDT(x.at)} · par ${esc(x.by || '?')}${x.corrected ? ` · corrigé par ${esc(x.corrected.by)}` : ''}</span>${isV ? `<span class="tot">${money(x.total)} $</span>` : `<span class="meta" style="margin-left:auto">${left ? `${fmtQty(left)} en stock` : 'tout vendu'}</span>`}</div>
+    <div class="chips">${people}</div>
+    <div class="row"><span class="spacer"></span><button class="btn sm" data-a="lcopy" data-id="${esc(x.id)}">${ic('copy')}Copier pour Discord</button>
+      ${isExec() ? `<button class="btn ghost sm" data-a="ledit" data-id="${esc(x.id)}">Corriger</button>` + (S.confirm === k ? `<button class="btn red sm" data-a="ldel" data-id="${esc(x.id)}">Confirmer la suppression</button><button class="btn sm" data-a="noconfirm">Garder</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}" aria-label="Supprimer">${ic('trash')}</button>`) : ''}</div>
+  </div></article>`;
+}
+function labsMain(){
+  const recs = labRecs('recolte'), vts = labRecs('vente');
+  const inP = x => inPeriod(x.at);
+  const stock = stockList().reduce((s, r) => s + r.left, 0);
+  const made = recs.filter(inP).reduce((s, r) => s + (r.pochons || 0), 0);
+  const sold = vts.filter(inP).reduce((s, v) => s + (v.pochons || 0), 0);
+  const cash = vts.filter(inP).reduce((s, v) => s + (v.total || 0), 0);
+  const prod = {}, sell = {};
+  recs.filter(inP).forEach(r => (r.people || []).forEach(n => { prod[n] = (prod[n] || 0) + (r.pochons || 0) / Math.max(1, (r.people || []).length); }));
+  vts.filter(inP).forEach(v => (v.sellers || []).forEach(s => { sell[s.name] = (sell[s.name] || 0) + (s.money || 0); }));
+  const lbHtml = (o, fmt) => { const e = Object.entries(o).sort((a, b) => b[1] - a[1]); const mx = e.length ? e[0][1] || 1 : 1;
+    return e.length ? `<div class="lb">${e.map(([n, v], i) => `<div class="lb-r"><span class="rk">${i + 1}</span><span class="nm"><span>${esc(n)}</span><span class="track"><i style="width:${Math.max(4, v / mx * 100)}%"></i></span></span><span class="v">${fmt(v)}</span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Personne pour l\'instant.</p>'; };
+  const plabel = {week:'cette semaine', month:'ce mois-ci', all:'depuis le début'}[S.period];
+  const all = recs.concat(vts).filter(inP).sort((a, b) => b.at - a.at);
+  const st = stockList();
+  return `<div class="row" style="margin-bottom:14px;gap:10px"><button class="btn pri" data-a="lnew" data-k="recolte">${ic('flask')}Nouvelle récolte</button><button class="btn ok" data-a="lnew" data-k="vente" ${stock || true ? '' : 'disabled'}>${ic('wallet')}Nouvelle vente</button><span class="spacer"></span>
+      <div class="seg" role="group" aria-label="Période"><button data-a="period" data-p="week" aria-pressed="${S.period==='week'}">Cette semaine</button><button data-a="period" data-p="month" aria-pressed="${S.period==='month'}">Ce mois</button><button data-a="period" data-p="all" aria-pressed="${S.period==='all'}">Tout</button></div></div>
+    <div class="kpis">
+      <div class="kpi"><small>Pochons en stock</small><b>${fmtQty(stock)}</b><span>créés, pas encore vendus</span></div>
+      <div class="kpi"><small>Pochons créés</small><b>${fmtQty(made)}</b><span>${plabel}</span></div>
+      <div class="kpi"><small>Pochons vendus</small><b>${fmtQty(sold)}</b><span>${plabel}</span></div>
+      <div class="kpi"><small>Argent des ventes</small><b>${money(cash)} $</b><span>${plabel}</span></div>
     </div>
     <div class="cols"><div class="stack">
-      ${edited ? batchCard(edited) : ''}
-      ${active.length ? active.map(batchCard).join('') : `<div class="empty"><strong>Aucune cuve en cours</strong>Lance une cuve avec le panneau « Nouvelle cuve ».</div>`}
-      <div class="panel"><h3>Historique</h3>${done.length ? `<div class="hist">${done.slice(0, 20).map(b => `<div class="hist-r"><span><b>${fmtQty(b.pochons != null ? b.pochons : r.output.qty)} pochons</b>${(b.log || []).some(l => l.step === 'corr') ? ' <span class="st-pill wait">corrigé</span>' : ''}<br><small>${fmtDT(b.doneAt)} · ${(b.log || []).filter(l => l.step !== 'corr').map(l => esc(l.by)).filter((v, i, a) => a.indexOf(v) === i).join(', ')}</small></span>
-          <span>${isExec() ? `<button class="btn ghost sm" data-a="labedit" data-id="${esc(b.id)}">Corriger</button>` : `<span class="st-pill ${b.toCoffre ? 'ok' : 'wait'}">${b.toCoffre ? 'Au coffre' : 'Pas au coffre'}</span>`}</span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Les cuves terminées apparaîtront ici.</p>'}</div>
-    </div>
-    <div class="stack">
-      <div class="panel"><h3>Nouvelle cuve · ${esc(r.name)}</h3><p class="hint">1 cuve = ${r.inputs.map(i => `${i.qty} ${i.name.toLowerCase()}`).join(', ')} → ${r.plates} plaquettes → ${r.fridgeMin} min au frigo → ${r.output.qty} pochons.</p>
-        <label class="field" for="lab-n">Nombre de cuves<input class="inp num" id="lab-n" data-c="labn" type="number" min="1" max="20" value="${n}" style="width:90px"></label>
-        <div class="tbl-wrap" style="margin-top:12px"><table><thead><tr><th>Ingrédient</th><th>Il faut</th><th>Coffre du labo</th></tr></thead><tbody>${rows}
-          <tr><td><b>Résultat</b></td><td class="num" colspan="2"><b>${fmtQty(r.plates * n)} plaquettes → ${fmtQty(r.output.qty * n)} pochons</b></td></tr></tbody></table></div>
-        <label class="check" style="margin-top:12px"><input type="checkbox" id="lab-fromcoffre" ${enough ? 'checked' : 'disabled'}>Prendre les ingrédients dans le coffre du labo${enough ? '' : ' (pas assez)'}</label>
-        <div class="row" style="margin-top:12px"><button class="btn pri" data-a="labstart" ${me() ? '' : 'disabled'}>${ic('flask')}Lancer ${n > 1 ? `${n} cuves` : 'la cuve'}</button></div>
-      </div>
-      <div class="panel"><h3>Qui a travaillé cette semaine</h3>${lb.length ? `<div class="lb">${lb.map(([nm, c], i) => `<div class="lb-r"><span class="rk">${i + 1}</span><span class="nm"><span>${esc(nm)}</span><span class="track"><i style="width:${Math.max(4, c / mx * 100)}%"></i></span></span><span class="v">${c} étape${c > 1 ? 's' : ''}</span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Chaque étape (cuve, frigo, pochons) compte pour celui qui la fait.</p>'}</div>
+      ${all.length ? all.map(labRecCard).join('') : `<div class="empty"><strong>Rien ${plabel}</strong>Commence par « Nouvelle récolte » quand des pochons sont créés.</div>`}
+    </div><div class="stack">
+      <div class="panel"><h3>Stock à vendre</h3>${st.length ? `<div class="hist">${st.map(r => `<div class="hist-r"><span><b>${fmtQty(r.left)} pochons</b> · ${esc(r.product || 'Fentanyl')}<br><small>Créés par ${esc(list2(r.people || []))} · ${fmtD(r.at)}</small></span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Aucun pochon en attente de vente.</p>'}</div>
+      <div class="panel"><h3>Création (pochons) ${plabel}</h3><p class="hint">Pochons d'une récolte partagés entre les présents.</p>${lbHtml(prod, v => fmtQty(Math.round(v)))}</div>
+      <div class="panel"><h3>Ventes ($) ${plabel}</h3>${lbHtml(sell, v => money(v) + ' $')}</div>
     </div></div>`;
 }
-function labSettings(site, r){
-  const exec = isExec(); const dis = exec ? '' : 'disabled';
-  return `<div class="cols"><div class="stack">
-    <div class="panel"><h3>Recette · ${esc(r.name)}</h3><p class="hint">${exec ? 'Corrige les quantités si le jeu a changé. Ça vaut pour tous les labos.' : 'Seuls les Exécutants et plus peuvent modifier la recette.'}</p>
-      <div class="stack" style="gap:8px">${r.inputs.map((i, k) => `<div class="row"><span style="flex:1">${esc(i.name)}</span><input class="inp num" id="rc-in-${k}" type="number" min="0" value="${i.qty}" style="width:100px" ${dis} aria-label="${esc(i.name)}"></div>`).join('')}
-        <div class="row"><span style="flex:1">Plaquettes extraites</span><input class="inp num" id="rc-plates" type="number" min="1" value="${r.plates}" style="width:100px" ${dis} aria-label="Plaquettes"></div>
-        <div class="row"><span style="flex:1">Minutes au réfrigérateur</span><input class="inp num" id="rc-fridge" type="number" min="1" value="${r.fridgeMin}" style="width:100px" ${dis} aria-label="Minutes au frigo"></div>
-        <div class="row"><span style="flex:1">Pochons obtenus</span><input class="inp num" id="rc-out" type="number" min="1" value="${r.output.qty}" style="width:100px" ${dis} aria-label="Pochons obtenus"></div>
-        ${exec ? `<div class="row"><button class="btn pri sm" data-a="recipesave">Enregistrer la recette</button>${(cfg().recipes || {})[r.id] ? `<button class="btn ghost sm" data-a="recipereset">Revenir à la recette d'origine</button>` : ''}</div>` : ''}</div></div>
-  </div><div class="stack">
-    <div class="panel"><h3>Labo · ${esc(site.name)}</h3>
-      <div class="row" style="align-items:flex-end">
-        <label class="field" style="flex:1;min-width:140px" for="st-name">Nom<input class="inp" id="st-name" maxlength="30" value="${esc(site.name)}" ${dis}></label>
-        <label class="field" for="st-cap">Capacité du coffre (kg)<input class="inp num" id="st-cap" type="number" min="1" value="${site.cap || 1500}" style="width:120px" ${dis}></label></div>
-      ${exec ? `<div class="row" style="margin-top:10px"><button class="btn pri sm" data-a="sitesave">Enregistrer</button><span class="spacer"></span>${S.confirm === 'sitedel' ? `<button class="btn red sm" data-a="sitedel">Confirmer</button><button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="sitedel">${ic('trash')}Retirer ce labo</button>`}</div>` : ''}
-    </div>
-    ${exec ? siteForm() : ''}
-  </div></div>`;
-}
 VIEWS.labos = () => {
-  const r = recipe('fentanyl');
   const tab = S.labTab || 'synthese';
-  const head = `<div class="row" style="margin-bottom:14px"><div class="seg" role="group" aria-label="Type de laboratoire">
-      <button data-a="labtab" data-t="synthese" aria-pressed="${tab==='synthese'}">Synthèse</button><button data-a="labtab" data-t="culture" aria-pressed="${tab==='culture'}">Culture</button></div></div>`;
+  const head = `<div class="row" style="margin-bottom:14px"><div class="seg" role="group" aria-label="Laboratoire">
+      <button data-a="labtab" data-t="synthese" aria-pressed="${tab==='synthese'}">Récoltes et ventes</button><button data-a="labtab" data-t="coffre" aria-pressed="${tab==='coffre'}">Coffre du labo</button><button data-a="labtab" data-t="culture" aria-pressed="${tab==='culture'}">Culture</button></div></div>`;
   if (tab === 'culture') return head + `<div class="empty"><strong>Laboratoires de culture</strong>Bientôt : explique-moi comment marchent vos cultures et je les ajoute ici.</div>`;
-  const site = curSite();
-  if (!site) return head + (isExec() ? siteForm() : `<div class="empty"><strong>Aucun labo enregistré</strong>Un Exécutant doit ajouter le labo (son nom et la capacité de son coffre).</div>`);
-  const sub = S.labSub || 'prod';
-  const bar = `<div class="row" style="margin-bottom:14px;gap:8px">
-      ${labSites().length > 1 ? `<div class="seg" role="group" aria-label="Labo">${labSites().map(s => `<button data-a="labsite" data-id="${esc(s.id)}" aria-pressed="${s.id === site.id}">${esc(s.name)}</button>`).join('')}</div>` : `<b style="font-size:15px;text-transform:uppercase">${esc(site.name)}</b>`}
-      <span class="spacer"></span>
-      <div class="seg" role="group" aria-label="Section"><button data-a="labsub" data-t="prod" aria-pressed="${sub==='prod'}">Production</button><button data-a="labsub" data-t="coffre" aria-pressed="${sub==='coffre'}">Coffre du labo</button><button data-a="labsub" data-t="reglages" aria-pressed="${sub==='reglages'}">Réglages</button></div></div>`;
-  if (sub === 'coffre') return head + bar + invView(sitePlace(site), {title:site.name, sub:'Coffre du labo de synthèse', cap:site.cap || 1500, seed:LAB_SEED, seedLabel:'Remplir avec le contenu de ta capture du coffre de Roxwood (acide, catalyseur, base opioïde, solvant, pochons, méthylamine…), puis corriger les quantités.'});
-  if (sub === 'reglages') return head + bar + labSettings(site, r);
-  return head + bar + labProduction(site, r);
+  if (tab === 'coffre') { const site = (cfg().labSites || [])[0] || {id:'roxwood', name:'Labo', cap:1500};
+    return head + invView('lab:' + site.id, {title:site.name, sub:'Coffre du labo de synthèse', cap:site.cap || 1500, seed:LAB_SEED, seedLabel:'Remplir avec le contenu de ta capture du coffre du labo (acide, catalyseur, base opioïde, solvant, pochons, méthylamine…), puis corriger les quantités.'}); }
+  return head + labsMain();
 };
-async function labStart(){
-  const site = curSite(); if (!me() || !site) return;
-  const r = recipe('fentanyl'); const place = sitePlace(site);
-  const n = Math.max(1, Math.min(20, parseInt(($('#lab-n') || {}).value, 10) || 1));
-  const fromCoffre = !!(($('#lab-fromcoffre') || {}).checked);
-  if (fromCoffre && possibleBatches(r, place) < n) { toast("Pas assez d'ingrédients dans le coffre du labo."); return; }
-  const at = Date.now(), by = me().name, byId = me().id;
-  if (fromCoffre) for (const i of r.inputs) await invAdjust(i.name, -i.qty * n, 'labo', 'chem', 'cuve', place);
-  for (let k = 0; k < n; k++) {
-    const id = uid('lab');
-    const d = {recipe:r.id, site:site.id, lab:site.name, status:'cuve', startedAt:at + k, by, byId, fromCoffre, log:[{step:'cuve', at, by, byId}], lastById:byId, lastAt:at};
-    S.labs.push(Object.assign({}, d, {id})); await Store.write('labs/' + id, d);
-  }
-  toast(n > 1 ? `${n} cuves lancées.` : 'Cuve lancée.'); render();
-}
-async function labNext(id){
-  const b = S.labs.find(x => x.id === id); if (!b || !me()) return;
-  const r = recipe(b.recipe); const site = siteOf(b); const at = Date.now(), by = me().name, byId = me().id;
-  const d = Object.assign({}, b); delete d.id;
-  d.log = (b.log || []).slice(); d.lastById = byId; d.lastAt = at;
-  if (b.status === 'cuve') { d.status = 'frigo'; d.fridgeAt = at; d.fridgeMin = r.fridgeMin; d.log.push({step:'frigo', at, by, byId}); }
-  else if (b.status === 'frigo') {
-    const box = $('#tocoffre-' + b.id); d.toCoffre = box ? box.checked : true;
-    d.status = 'fini'; d.doneAt = at; d.pochons = r.output.qty; d.log.push({step:'fini', at, by, byId});
-  } else return;
-  S.confirm = null; Object.assign(b, d);
-  const ok = await Store.write('labs/' + id, d);
-  if (ok && d.status === 'fini' && d.toCoffre && site) await invAdjust(r.output.name, r.output.qty, 'labo', 'drug', 'pochons', sitePlace(site));
-  if (ok) toast(d.status === 'frigo' ? `${r.plates} plaquettes au frigo pour ${r.fridgeMin} minutes.` : `${r.output.qty} pochons prêts${d.toCoffre ? ' et rangés au coffre du labo' : ''}.`);
-  render();
-}
-async function labFix(id){
-  const b = S.labs.find(x => x.id === id); if (!b || !isExec()) return;
-  const r = recipe(b.recipe); const at = Date.now();
-  const val = s => ($(s + '-' + id) || {}).value;
-  const site = labSites().find(s => s.id === val('#be-site')) || siteOf(b);
-  const st = val('#be-st') || b.status;
-  const d = Object.assign({}, b); delete d.id;
-  d.site = site ? site.id : d.site; d.lab = site ? site.name : d.lab; d.status = st;
-  if (st === 'frigo') { const left = Math.max(0, parseInt(val('#be-min'), 10) || 0); d.fridgeMin = r.fridgeMin; d.fridgeAt = at - (r.fridgeMin - left) * 60000; delete d.doneAt; }
-  if (st === 'fini') { d.doneAt = b.doneAt || at; d.pochons = Math.max(0, parseInt(val('#be-po'), 10) || 0); }
-  if (st === 'cuve') { delete d.fridgeAt; delete d.doneAt; }
-  d.log = (b.log || []).concat([{step:'corr', at, by:me().name, byId:me().id}]); d.lastById = me().id; d.lastAt = at;
-  Object.assign(b, d); S.labEdit = null;
-  const ok = await Store.write('labs/' + id, d);
-  if (ok) toast('Production corrigée.');
-  render();
-}
-// Compte à rebours en direct + bip quand le frigo est prêt (si la page est ouverte).
-let audioCtx = null;
-document.addEventListener('pointerdown', () => { try { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {} }, {once:true});
-function beep(){ try { if (!audioCtx) return; [0, 0.25, 0.5].forEach(t => { const o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.frequency.value = 880; g.gain.value = 0.08; o.connect(g); g.connect(audioCtx.destination); o.start(audioCtx.currentTime + t); o.stop(audioCtx.currentTime + t + 0.15); }); } catch(e) {} }
-const fridgeNotified = new Set();
-setInterval(() => {
-  const now = Date.now();
-  S.labs.filter(b => b.status === 'frigo').forEach(b => {
-    if (fridgeEnd(b) <= now && !fridgeNotified.has(b.id + ':' + b.fridgeAt)) {
-      fridgeNotified.add(b.id + ':' + b.fridgeAt);
-      if (now - fridgeEnd(b) < 5000) { beep(); toast(`Frigo prêt : ${b.lab || 'Labo'}. Casse les plaquettes !`); if (S.view === 'labos') scheduleRender(); }
-    }
-  });
-  if (S.view !== 'labos') return;
-  document.querySelectorAll('[data-until]').forEach(el => { const left = Number(el.dataset.until) - now; el.textContent = left <= 0 ? 'Prêt' : mmss(left); });
-  document.querySelectorAll('[data-bar]').forEach(el => { const left = Number(el.dataset.bar) - now; el.style.width = Math.min(100, Math.max(0, 100 - left / Number(el.dataset.len) * 100)) + '%'; });
-}, 1000);
 
 /* ---------- Actions ---------- */
 const A = {
@@ -1895,26 +1857,32 @@ const A = {
     Store.write('sanctions/' + sx.id, d).then(ok => { if (ok) toast('Sanction annulée.'); }); render(); },
   ctab(t){ S.coffreTab = t.dataset.t; render(); },
   labtab(t){ S.labTab = t.dataset.t; render(); },
-  labsite(t){ S.labSite = t.dataset.id; S.labEdit = null; render(); },
-  labsub(t){ S.labSub = t.dataset.t; S.confirm = null; render(); },
-  labstart(t){ t.disabled = true; labStart(); },
-  labnext(t){ t.disabled = true; labNext(t.dataset.id); },
-  labfix(t){ t.disabled = true; labFix(t.dataset.id); },
-  labedit(t){ S.labEdit = t.dataset.id; render(); window.scrollTo({top:0, behavior:'smooth'}); },
-  labeditclose(){ S.labEdit = null; render(); },
-  labdel(t){ const b = S.labs.find(x => x.id === t.dataset.id); S.confirm = null; if (!b || !isExec()) return;
-    const d = Object.assign({}, b, {_del:true, lastById:me().id, lastAt:Date.now()}); S.labs = S.labs.filter(x => x !== b);
-    Store.write('labs/' + b.id, d).then(ok => { if (ok) toast('Production supprimée (le coffre du labo n\'est pas modifié).'); }); render(); },
-  siteadd(){ if (!isExec()) return; const name = (($('#ns-name') || {}).value || '').trim().slice(0, 30); if (!name) { toast('Indique le nom du labo.'); return; }
-    const cap = Math.max(1, parseInt(($('#ns-cap') || {}).value, 10) || 1500); let id = slug(name); while (labSites().some(x => x.id === id)) id += '-2';
-    S.labSite = id; saveConfig({labSites: labSites().concat([{id, name, cap, type:'synthese'}])}); toast(`Labo ${name} ajouté.`); },
-  sitesave(){ const site = curSite(); if (!site || !isExec()) return; const name = (($('#st-name') || {}).value || '').trim().slice(0, 30) || site.name; const cap = Math.max(1, parseInt(($('#st-cap') || {}).value, 10) || site.cap || 1500);
-    saveConfig({labSites: labSites().map(x => x.id === site.id ? Object.assign({}, x, {name, cap}) : x)}); toast('Labo mis à jour.'); },
-  sitedel(){ const site = curSite(); S.confirm = null; if (!site || !isExec()) return; S.labSite = null; saveConfig({labSites: labSites().filter(x => x.id !== site.id)}); toast(`Labo ${site.name} retiré (son historique est gardé).`); },
-  recipesave(){ if (!isExec()) return; const r = recipe('fentanyl'); const num = (sel, d) => Math.max(0, parseInt(($(sel) || {}).value, 10) || d);
-    const o = {inputs: r.inputs.map((i, k) => ({qty: num('#rc-in-' + k, i.qty)})), plates: Math.max(1, num('#rc-plates', r.plates)), fridgeMin: Math.max(1, num('#rc-fridge', r.fridgeMin)), output: {qty: Math.max(1, num('#rc-out', r.output.qty))}};
-    saveConfig({recipes: Object.assign({}, cfg().recipes || {}, {fentanyl: o})}); toast('Recette enregistrée.'); },
-  recipereset(){ if (!isExec()) return; const rs = Object.assign({}, cfg().recipes || {}); delete rs.fentanyl; saveConfig({recipes: rs}); toast("Recette d'origine remise."); },
+  lnew(t){ if (!me()) return; S.lw = newLabWiz(t.dataset.k); renderLabWiz(); },
+  lclose(){ S.lw = null; renderLabWiz(); },
+  lstep(t){ const w = S.lw; if (!w) return; const to = Number(t.dataset.to);
+    if (w.kind === 'vente' && to >= 1 && !(lwPochons(w) > 0)) return;
+    if (to > w.step && w.kind === 'recolte' && w.step === 0 && !w.people.length) return;
+    if (w.kind === 'vente' && to === 2) { if (!w.people.length) return; const sum = w.people.reduce((s, p) => s + (parseInt(w.shares[p], 10) || 0), 0); if (sum !== lwPochons(w) || w.people.some(p => w.shares[p] == null)) lwSplit(w); }
+    w.step = to; renderLabWiz(); const ov = $('#modal .ov'); if (ov) ov.scrollTop = 0; },
+  lptoggle(t){ const w = S.lw, n = t.dataset.n; const i = w.people.indexOf(n); if (i >= 0) w.people.splice(i, 1); else w.people.push(n); renderLabWiz(); },
+  lpnone(){ S.lw.people = []; renderLabWiz(); },
+  lguest(){ const inp = $('#lguest-in'); const v = ((inp && inp.value) || '').trim().slice(0, 30); if (!v) return; if (!S.lw.people.includes(v)) S.lw.people.push(v); renderLabWiz(); const ni = $('#lguest-in'); if (ni) ni.focus(); },
+  lsrc(t){ const w = S.lw, id = t.dataset.id; if (w.sources[id] != null) delete w.sources[id];
+    else { const r = S.labs.find(x => x.id === id); const back = w.editId ? (((S.labs.find(x => x.id === w.editId) || {}).sources || []).find(x => x.id === id) || {}).qty || 0 : 0; w.sources[id] = String(remainingOf(r) + back); }
+    renderLabWiz(); },
+  lsave(t){ t.disabled = true; lwSave(); },
+  lcopywiz(){ const w = S.lw; if (!w) return; const v = lwRecord(w); copy(w.kind === 'recolte' ? recolteText(v) : venteText(v), $('#ldisc')); },
+  lcopy(t){ const x = S.labs.find(y => y.id === t.dataset.id); if (x) copy(x.kind === 'vente' ? venteText(x) : recolteText(x), null); },
+  ledit(t){ const x = S.labs.find(y => y.id === t.dataset.id); if (!x || !isExec()) return;
+    const w = newLabWiz(x.kind); w.editId = x.id; w.product = x.product || 'Fentanyl';
+    if (x.kind === 'recolte') { w.people = (x.people || []).slice(); w.pochons = String(x.pochons || ''); w.step = 1; }
+    else { w.people = (x.sellers || []).map(s => s.name); (x.sources || []).forEach(s => { w.sources[s.id] = String(s.qty); }); w.extra = x.extra ? String(x.extra) : '';
+      (x.sellers || []).forEach(s => { w.shares[s.name] = s.pochons; w.money[s.name] = String(s.money || ''); }); w.step = 2; }
+    S.lw = w; renderLabWiz(); },
+  ldel(t){ const x = S.labs.find(y => y.id === t.dataset.id); S.confirm = null; if (!x || !isExec()) return;
+    if (x.kind === 'recolte' && soldFrom(x.id) > 0) { toast('Des pochons de cette récolte ont déjà été vendus : corrige ou supprime d\'abord la vente.'); render(); return; }
+    const d = Object.assign({}, x, {_del:true, lastById:me().id, lastAt:Date.now()}); S.labs = S.labs.filter(y => y !== x);
+    Store.write('labs/' + x.id, d).then(ok => { if (ok) toast('Supprimé.'); }); render(); },
   invcat(t){ S.invCat = t.dataset.c2; render(); },
   invsel(t){ S.invSel = S.invSel === t.dataset.id ? null : t.dataset.id; S.confirm = null; render(); },
   mvq(t){ S.mvN = Number(t.dataset.n); const i = $('#mv-n'); if (i) i.value = S.mvN; },
@@ -2015,12 +1983,17 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.id === 'pw-new2') { e.preventDefault(); A.chpw(); }
   if (e.key === 'Enter' && e.target.id === 'sx-reason') { e.preventDefault(); A.sanction(); }
   if (e.key === 'Enter' && e.target.id === 'ia-name') { e.preventDefault(); A.invadd(); }
+  if (e.key === 'Enter' && e.target.id === 'lguest-in') { e.preventDefault(); A.lguest(); }
 });
 document.addEventListener('toggle', e => { const d = e.target; if (d && d.dataset && d.dataset.edit) S.labEdit = d.open ? d.dataset.edit : (S.labEdit === d.dataset.edit ? null : S.labEdit); }, true);
 document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.c === 'invq') { S.invQ = t.value; const g = $('#inv-grid'); if (g) g.innerHTML = gridHtml(); return; }
   if (t.dataset.c === 'sxreason') { S.sxReason = t.value; return; }
+  if (S.lw && ['lprod','lpoch','lsrcq','lextra','lshare','lmoney'].includes(t.dataset.c)) { const w = S.lw, c = t.dataset.c;
+    if (c === 'lprod') w.product = t.value; if (c === 'lpoch') w.pochons = t.value.replace(/\D/g, ''); if (c === 'lextra') w.extra = t.value;
+    if (c === 'lsrcq') w.sources[t.dataset.id] = t.value; if (c === 'lshare') w.shares[t.dataset.n] = t.value; if (c === 'lmoney') w.money[t.dataset.n] = t.value;
+    lwRefresh(); return; }
   if (t.dataset.c !== 'total' || !S.wiz) return;
   S.wiz.total = t.value; saveWiz();
   const op = opFromWiz(S.wiz); const d = $('#disc'); if (d) d.textContent = discordText(op);
@@ -2038,7 +2011,6 @@ document.addEventListener('change', e => {
     case 'crewlevel': saveConfig({crewLevel: Math.max(1, Math.min(99, parseInt(t.value,10) || 1))}); break;
     case 'ilabel': { const it = items(); it[Number(t.dataset.i)].label = t.value.trim().slice(0,40) || 'Objet'; saveConfig({coffreItems: it}); break; }
     case 'iqty': { const it = items(); it[Number(t.dataset.i)].qty = Math.max(1, parseInt(t.value,10) || 1); saveConfig({coffreItems: it}); break; }
-    case 'labn': S.labN = Math.max(1, Math.min(20, parseInt(t.value, 10) || 1)); render(); break;
     case 'sxmember': S.sxMember = t.value; S.confirm = null; { const r = $('#sx-reason'); if (r) S.sxReason = r.value; } render(); break;
     case 'mgrade': { const m = S.mdocs.find(x => x.id === t.dataset.id); if (canEditMember(m) && gradeChoices().includes(t.value)) writeMember(m.id, {grade: t.value}); else render(); break; }
   }
