@@ -80,8 +80,10 @@ Il n'y a **pas de Firebase Auth**. Le système est maison :
    - **mise à jour de sécurité** : quand l'admin se connecte et que `crew/v3` n'existe pas, le site régénère les mots de passe de tout le monde ;
    - lien `#migration` pour un crew jamais sécurisé.
 8. **Limite connue** : quelqu'un qui récupère l'identifiant du crew (dans le navigateur d'un membre) peut **lire** les données, mais pas les modifier.
-9. **Rien n'est jamais supprimé** : on marque `_del: true`, `removed: true` ou `status: 'none'`. Les règles interdisent les suppressions définitives.
-10. Champs hérités à tolérer : `_k` (ancien code de l'auteur, retiré à chaque réécriture).
+9. **Journal obligatoire** : chaque batch écrit aussi `crews/<crew>/logs/<id de la preuve>` = `{at, byId, by, items[{s, t, p, d[{f, a, b}], minor}], more, minor}`. La règle `lvl()` exige `existsAfter` de cette ligne : aucune écriture authentifiée ne peut échapper au journal, et les lignes ne sont jamais modifiables ni effaçables. Les mots de passe, clés, chemin du coffre à codes et photos n'y sont jamais recopiés. Si les anciennes règles refusent la ligne, le site réessaie une fois sans journal (transition).
+10. **Fondateur** : `crew/meta.admin` est l'admin d'origine. Aucun autre admin ne peut modifier sa fiche ni lui créer une clé.
+11. **Rien n'est jamais supprimé** : on marque `_del: true`, `removed: true` ou `status: 'none'`. Les règles interdisent les suppressions définitives.
+12. Champs hérités à tolérer : `_k` (ancien code de l'auteur, retiré à chaque réécriture).
 
 ### Droits par grade (appliqués dans les règles Firestore et dans l'interface)
 Les règles calculent un niveau : 0 = aucun, 1 = Membre/Lieutenant, 2 = Exécutant, 3 = Patron/Co-Patron, 4 = admin.
@@ -91,7 +93,7 @@ Les règles calculent un niveau : 0 = aucun, 1 = Membre/Lieutenant, 2 = Exécuta
 | Membre / Lieutenant | Consulter ; s'inscrire à une formation ; cocher la roue du coffre quand c'est son tour ; déposer et retirer dans les coffres ; enregistrer récoltes et ventes ; compléter les fiches de renseignement ; changer son mot de passe |
 | Exécutant (élite) | En plus : lancer les OP, tirer la roue, gérer les formations, **sanctionner, changer le grade (Lieutenant ↔ Membre) et virer les Lieutenants et Membres**, gérer les objets du coffre, corriger ou supprimer récoltes et ventes, supprimer une fiche de renseignement |
 | Patron / Co-Patron | Tout sauf les codes d'accès : ajouter des membres, tous les grades, paramètres, annuler une sanction, supprimer un bilan, désigner les formateurs |
-| Admin (Le R) | Tout, y compris les codes d'accès et la réinitialisation des mots de passe |
+| Admin | Tout, y compris les codes d'accès, la réinitialisation des mots de passe, les **Logs** et la nomination d'autres admins (le fondateur reste protégé) |
 
 Un **formateur désigné** (même Membre) peut accepter, refuser et valider les demandes de **sa** formation, et seulement celle-là.
 
@@ -190,6 +192,10 @@ Postes :
 - Pour chaque membre : son mot de passe de départ (masqué, avec « Afficher »), le bouton **Copier** (message prêt à envoyer en privé : lien `#id=Nom`, identifiant, mot de passe), **Réinitialiser**, et « Créer les mots de passe manquants ».
 - La mention « Changé par le membre » s'affiche quand il l'a modifié.
 
+### Logs (admins seulement), 2 onglets
+- **Journal** : toutes les modifications, groupées par jour (heure, auteur, partie du site, phrase lisible comme « Le J : grade Membre → Lieutenant » ou « Coffre de la villa : -3 Menus »). On déplie une ligne pour voir le détail avant → après. Filtres par auteur et par partie, recherche, case « Sauvegardes auto » (sauvegardes de l'OP en cours et historique du coffre, masquées par défaut), bouton « Voir les plus anciennes » (par 150).
+- **Admins** : liste des admins (badge fondateur), « Nommer admin » (nouveau mot de passe généré avec l'accès aux codes, affiché pour être envoyé), « Retirer admin ». On ne peut pas changer son propre statut.
+
 ### Bientôt
 Paies, et laboratoires de culture.
 
@@ -212,6 +218,7 @@ Paies, et laboratoires de culture.
 | `sanctions/<id>` | `memberId, member, type (rappel, avert), reason, by, byId, cancelled` |
 | `intel/<id>` | fiches de renseignement (`name, color, colorHex, claims, radio, threat, villa{desc, imgId}, boss{name, notes, imgId}, people[], notes[], log[], lastById`) |
 | `intelimg/<id>` | `{data: dataURL JPEG, orgId, byId}` |
+| `logs/<id de preuve>` | journal des modifications (lu par la page Logs des admins) |
 | `proofs/<id>` | preuves d'écriture (illisibles) |
 | `v/<secret>/codes/<memberId>` | mots de passe de départ (admin) |
 
@@ -222,7 +229,7 @@ Hors crew : `keys/<clé>`.
 ## 7. Règles à respecter pour toute modification
 
 1. Garder **un seul `index.html`** en JavaScript vanilla, et le style existant (jetons CSS, composants, ton français).
-2. **Toute écriture passe par `Store.write / Store.batch / Store.incr`**, qui ajoutent la preuve `_p`. Ne jamais écrire directement dans Firestore.
+2. **Toute écriture passe par `Store.write / Store.batch / Store.incr`**, qui ajoutent la preuve `_p` et la ligne de journal (décrite par `logItem` : ajouter un cas pour toute nouvelle collection). Ne jamais écrire directement dans Firestore.
 3. **Toute nouvelle collection ou tout nouveau champ contrôlé** demande une mise à jour de `firestore.rules`, puis le rappel au propriétaire de **recoller les règles**. Garder les fonctions de règles économes (une limite de 1 000 expressions par règle oblige à calculer `lvl(c)` une seule fois par fonction).
 4. Pas de suppressions définitives : marquer `_del`, `removed` ou `status: 'none'`.
 5. Vérifier les droits **dans l'interface ET dans les règles**.

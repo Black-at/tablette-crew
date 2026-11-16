@@ -26,6 +26,9 @@ Pas besoin d'activer quoi que ce soit dans Firebase : il suffit de publier les r
   le site lui demande une **mise à jour de sécurité** qui crée un mot de passe pour chacun et désactive tous les anciens codes.
 - Crew qui n'avait qu'un code de crew : l'admin ouvre `https://<ton-pseudo>.github.io/tablette-crew/#migration`.
 - Onglet **Codes d'accès** (admin) : « Copier » prépare le message à envoyer en privé, « Réinitialiser » en cas d'oubli ou de fuite.
+- Onglet **Logs** (admins) : le journal de toutes les modifications (qui, quand, avant → après), et l'onglet **Admins** pour nommer ou retirer des admins.
+  Chaque modification écrit sa ligne de journal en même temps (exigé par les règles) ; personne ne peut la modifier ni l'effacer.
+  Le fondateur (l'admin d'origine) ne peut pas être modifié par un autre admin.
 
 ## Droits
 | Grade | Peut faire |

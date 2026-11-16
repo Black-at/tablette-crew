@@ -172,6 +172,20 @@ select.inp{padding-right:8px}
 .kpi small{display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .kpi b{display:block;font-size:22px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .kpi span{font-size:11.5px;color:var(--muted)}
+.lg-list{padding:6px 0}
+.lg-day{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:12px 16px 6px}
+details.lg{border-top:1px solid var(--line)}
+details.lg summary{display:grid;grid-template-columns:44px minmax(60px,110px) auto minmax(0,1fr);gap:10px;align-items:center;padding:9px 16px;cursor:pointer;list-style:none;font-size:13px}
+details.lg summary::-webkit-details-marker{display:none}
+details.lg[data-flat] summary{cursor:default}
+details.lg summary:hover{background:rgba(255,255,255,.03)}
+.lg-t{color:var(--muted);font-size:12px}.lg-by{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lg-s{display:flex;gap:4px;flex-wrap:wrap}.lg-x{min-width:0;overflow-wrap:anywhere;color:#d6d9de}.lg-x small{color:var(--accent-hi);font-weight:600}
+.lg-det{padding:4px 16px 12px 70px;display:flex;flex-direction:column;gap:8px}
+.lg-it{font-size:12.5px;color:#c9ccd2;border-left:2px solid var(--line-2);padding-left:10px}
+.lg-d{margin-top:4px;border-collapse:collapse;font-size:12px}.lg-d th{text-align:left;color:var(--muted);font-weight:500;padding:2px 10px 2px 0;white-space:nowrap}
+.lg-d td{padding:2px 6px 2px 0;overflow-wrap:anywhere}.lg-d td.old{color:var(--dim);text-decoration:line-through}
+@media (max-width:640px){details.lg summary{grid-template-columns:40px minmax(0,1fr);row-gap:4px}.lg-s{grid-column:2}.lg-x{grid-column:1/-1}.lg-det{padding-left:16px}}
 
 /* OP history */
 .opc{display:grid;grid-template-columns:6px minmax(0,1fr);background:var(--card);border:1px solid var(--line-2);border-radius:5px;overflow:hidden}
@@ -598,7 +612,8 @@ const NAV = [
   {id:'membres', label:'Membres', icon:'users', title:'Membres', sub:'La hiérarchie du crew et le parcours de chaque membre.'},
   {id:'sanctions', label:'Sanctions', icon:'alert', title:'Sanctions', sub:"Rappels à l'ordre et avertissements. 2 avertissements = viré."},
   {id:'parametres', label:'Paramètres', icon:'gear', title:'Paramètres', sub:'Nom et niveau du crew, contenu du coffre, profil.'},
-  {id:'comptes', label:"Codes d'accès", icon:'lock', title:"Codes d'accès", sub:'Le mot de passe de départ de chaque membre. Toi seul les vois.', admin:true},
+  {id:'comptes', label:"Codes d'accès", icon:'lock', title:"Codes d'accès", sub:'Le mot de passe de départ de chaque membre. Seuls les admins les voient.', admin:true},
+  {id:'logs', label:'Logs', icon:'clock', title:'Logs', sub:'Tout ce qui a été modifié sur le site, par qui et quand. Et les admins du site.', admin:true},
   {id:'paies', label:'Paies', icon:'wallet', soon:true},
 ];
 
@@ -632,7 +647,7 @@ function toast(msg){ const t = $('#toast'); t.textContent = msg; t.classList.add
 const FB_CFG = window.FIREBASE_CONFIG || null;
 const hasFB = !!(FB_CFG && FB_CFG.apiKey && !/COLLE|XXX/i.test(FB_CFG.apiKey) && window.firebase);
 const Store = {
-  mode:'init', db:null, q:{}, local:{}, subs:[], unsubs:[], synced:false, code:null, key:null,
+  mode:'init', db:null, q:{}, local:{}, subs:[], unsubs:[], synced:false, code:null, key:null, cache:{}, logsOk:false,
   init(){
     if (hasFB) {
       try {
@@ -647,14 +662,14 @@ const Store = {
   // Chaque écriture part avec une preuve à usage unique (illisible par tous) qui contient la clé de l'auteur.
   proof(b){ const id = 'p' + rnd(22); b.set(this.db.doc(this.p('proofs/' + id)), {k: this.key || 'BOOT'}); return id; },
   p(path){ return 'crews/' + this.code + '/' + path; },
-  stopAll(){ this.unsubs.forEach(u => { try { u(); } catch(e){} }); this.unsubs = []; this.subs = []; this.synced = this.mode === 'local'; },
+  stopAll(){ this.unsubs.forEach(u => { try { u(); } catch(e){} }); this.unsubs = []; this.subs = []; this.cache = {}; this.synced = this.mode === 'local'; },
   emitLocal(){ LS.set('crew-local-db', this.local); this.subs.forEach(s => s.fire()); },
   // opt = {order:'at', dir:'desc', limit:40} pour ne lire que les derniers documents.
   watchColl(name, cb, opt){
     if (this.mode === 'fire') {
       let q = this.db.collection(this.p(name));
       if (opt) q = q.orderBy(opt.order, opt.dir || 'asc').limit(opt.limit || 50);
-      const u = q.onSnapshot(s => { if (!s.metadata.fromCache) markSynced(); cb(s.docs.map(d => Object.assign({}, d.data(), {id:d.id})).filter(d => !d._del)); }, e => syncError(e, name));
+      const u = q.onSnapshot(s => { if (!s.metadata.fromCache) markSynced(); s.docs.forEach(d => { this.cache[name + '/' + d.id] = d.data(); }); cb(s.docs.map(d => Object.assign({}, d.data(), {id:d.id})).filter(d => !d._del)); }, e => syncError(e, name));
       this.unsubs.push(u); return u;
     }
     const depth = name.split('/').length + 1;
@@ -667,7 +682,7 @@ const Store = {
   },
   watchDoc(path, cb){
     if (this.mode === 'fire') {
-      const u = this.db.doc(this.p(path)).onSnapshot(s => { if (!s.metadata.fromCache) markSynced(); cb(s.exists ? s.data() : null); }, e => syncError(e, path));
+      const u = this.db.doc(this.p(path)).onSnapshot(s => { if (!s.metadata.fromCache) markSynced(); this.cache[path] = s.exists ? s.data() : null; cb(s.exists ? s.data() : null); }, e => syncError(e, path));
       this.unsubs.push(u); return u;
     }
     const sub = {fire:() => cb(this.local[path] ? JSON.parse(JSON.stringify(this.local[path])) : null)};
@@ -675,12 +690,22 @@ const Store = {
   },
   async getDoc(path){ if (this.mode !== 'fire') return this.local[path] || null; const d = await this.db.doc(this.p(path)).get(); return d.exists ? d.data() : null; },
   async getRoot(path){ if (this.mode !== 'fire') return null; const d = await this.db.doc(path).get(); return d.exists ? d.data() : null; },
+  // Envoie un groupe d'écritures avec sa preuve et sa ligne de journal (logs/<id de la preuve>).
+  // Les règles exigent cette ligne : aucune modification ne peut échapper au journal.
+  async commit(build, ops){
+    let entry = null; try { entry = logEntry(ops); } catch(e) { console.error(e); }
+    const go = withLog => { const b = this.db.batch(); const pid = this.proof(b); build(b, pid);
+      if (withLog) b.set(this.db.doc(this.p('logs/' + pid)), Object.assign({}, entry || {at:Date.now(), byId:S.meId || '', by:'?', items:[]}, {_p:pid}));
+      return b.commit(); };
+    try { await go(true); this.logsOk = true; }
+    catch(e) { if (e && e.code === 'permission-denied' && !this.logsOk) await go(false); else throw e; } // anciennes règles sans journal
+  },
   // Retire l'identifiant interne et l'ancien champ _k (qui contenait le code de l'auteur).
   sign(data){ const d = JSON.parse(JSON.stringify(data)); delete d.id; delete d._k; return d; },
   // Écritures groupées : [{path, data, root?}] — root = chemin hors crew (keys).
   async batch(list){
     if (this.mode !== 'fire') { list.forEach(w => { if (!w.root) this.local[w.path] = this.sign(w.data); }); this.emitLocal(); return true; }
-    try { const b = this.db.batch(); const pid = this.proof(b); list.forEach(w => b.set(this.db.doc(w.root ? w.path : this.p(w.path)), Object.assign(this.sign(w.data), {_p:pid}))); await b.commit(); return true; }
+    try { await this.commit((b, pid) => list.forEach(w => b.set(this.db.doc(w.root ? w.path : this.p(w.path)), Object.assign(this.sign(w.data), {_p:pid}))), list); return true; }
     catch(e) { return writeErr(e); }
   },
   write(path, data){
@@ -688,7 +713,7 @@ const Store = {
     const clean = this.sign(data === null ? {_del:true} : data);
     if (this.mode !== 'fire') { this.local[path] = clean; this.emitLocal(); return Promise.resolve(true); }
     const prev = this.q[path] || Promise.resolve();
-    const run = () => { const b = this.db.batch(); const pid = this.proof(b); b.set(this.db.doc(this.p(path)), Object.assign({}, clean, {_p:pid})); return b.commit(); };
+    const run = () => this.commit((b, pid) => b.set(this.db.doc(this.p(path)), Object.assign({}, clean, {_p:pid})), [{path, data:clean}]);
     const p = prev.catch(()=>{}).then(run).then(() => true, e => writeErr(e));
     this.q[path] = p; return p;
   },
@@ -696,7 +721,7 @@ const Store = {
   incr(path, n, extra){
     if (this.mode !== 'fire') { const d = this.local[path]; if (d) { d.qty = (d.qty||0) + n; Object.assign(d, extra); this.emitLocal(); } return Promise.resolve(true); }
     const prev = this.q[path] || Promise.resolve();
-    const run = () => { const b = this.db.batch(); const pid = this.proof(b); b.update(this.db.doc(this.p(path)), Object.assign({qty: firebase.firestore.FieldValue.increment(n)}, extra, {_p:pid})); return b.commit(); };
+    const run = () => this.commit((b, pid) => b.update(this.db.doc(this.p(path)), Object.assign({qty: firebase.firestore.FieldValue.increment(n)}, extra, {_p:pid})), [{path, incr:n, data:extra}]);
     const p = prev.catch(()=>{}).then(run).then(() => true, e => writeErr(e));
     this.q[path] = p; return p;
   }
@@ -711,12 +736,113 @@ function writeErr(e){
 function markSynced(){ if (!Store.synced) { Store.synced = true; renderSync(); } }
 function syncError(e, what){ S.syncErr = {code: (e && e.code) || '', what: what || ''}; renderSync(); renderTop(); }
 
+/* ---------- Journal (logs) : une ligne par modification, écrite avec la modification elle-même ---------- */
+const LOG_SEC = {members:'Membres', ops:'Bilans', live:'OP en cours', coffre:'Roue du coffre', formations:'Formations', sanctions:'Sanctions', inv:'Coffre', labs:'Laboratoires', intel:'Renseignements', crew:'Paramètres', comptes:"Codes d'accès"};
+// Champs jamais recopiés dans le journal (techniques, ou secrets comme les mots de passe et les photos).
+const LOG_SKIP = new Set(['_p','_k','_del','id','at','updatedAt','lastAt','lastById','lastBy','by','byId','password','data','k','history','vault','kv']);
+const LOG_FR = {name:'nom', grade:'grade', removed:'viré', admin:'admin', pwChanged:'mot de passe changé', crewName:'nom du crew', crewLevel:'niveau du crew',
+  coffreItems:'contenu du coffre', coffreExclude:'exclus de la roue', coffreExcludeLast:'exclure le dernier', trainers:'formateurs', labSites:'labos', recipes:'recettes',
+  qty:'quantité', min:'minimum', cat:'catégorie', w:'poids', icon:'icône', place:'emplacement', status:'statut', session:'session', note:'note', reason:'raison',
+  cancelled:'annulée', total:'total', participants:'participants', result:'résultat', missionName:'mission', targetOrg:'organisation visée', pochons:'pochons',
+  product:'produit', sellers:'vendeurs', sources:'récoltes', color:'couleur', radio:'radio', threat:'menace', boss:'patron', villa:'villa', people:'membres connus',
+  notes:'journal', claims:'revendique', items:'cases', member:'membre', memberId:'membre', trainer:'formateur', postes:'postes', vehicles:'véhicules'};
+const mNameOf = id => { const m = S.mdocs.find(x => x.id === id); return m ? m.name : (id || '?'); };
+function logVal(v){
+  if (v === undefined || v === null || v === '') return '—';
+  if (typeof v === 'boolean') return v ? 'oui' : 'non';
+  if (typeof v === 'number') return String(v);
+  if (typeof v === 'string') return v.length > 80 ? v.slice(0, 79) + '…' : v;
+  if (Array.isArray(v) && v.every(x => x && typeof x === 'object' && (x.name || x.label))) { const t = v.map(x => x.name || x.label).join(', '); return t.length > 80 ? t.slice(0, 79) + '…' : (t || '—'); }
+  if (Array.isArray(v) && v.every(x => typeof x !== 'object')) return logVal(v.map(mNameOfMaybe).join(', '));
+  const j = JSON.stringify(v); return j.length > 80 ? j.slice(0, 79) + '…' : j;
+}
+const mNameOfMaybe = x => (typeof x === 'string' && S.mdocs.some(m => m.id === x)) ? mNameOf(x) : x;
+function logDiff(a, b){
+  a = a || {}; b = b || {}; const out = [];
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (LOG_SKIP.has(k) || JSON.stringify(a[k]) === JSON.stringify(b[k])) continue;
+    out.push({f: LOG_FR[k] || k, a: logVal(a[k]), b: logVal(b[k])});
+  }
+  return out.slice(0, 12);
+}
+function placeName(p){ if (!p || p === 'villa') return 'Coffre de la villa'; const id = String(p).replace(/^lab:/, ''); const s = (cfg().labSites || []).find(x => x.id === id); return 'Coffre du labo ' + (s ? s.name : id); }
+function logItem(op){
+  const path = op.path || '';
+  if (op.root || path.startsWith('keys/')) return {s:'comptes', t:`Nouvelle clé de connexion pour ${mNameOf((op.data || {}).memberId)}`};
+  const parts = path.split('/'), col = parts[0], id = parts.slice(1).join('/');
+  if (col === 'v') return {s:'comptes', t:`Mot de passe de départ de ${mNameOf(parts[3])} enregistré`}; // le chemin contient le coffre secret : jamais recopié
+  if (col === 'proofs' || col === 'logs') return null;
+  const before = Store.cache[path] || null, live = before && !before._del ? before : null;
+  const inc = op.incr != null, after = inc ? null : (op.data || {}), del = !!(after && after._del);
+  const x = Object.assign({}, live || {}, after || {});
+  const d = inc ? [{f:'quantité', a:logVal((live || {}).qty || 0), b:logVal(((live || {}).qty || 0) + op.incr)}] : logDiff(live, del ? null : after);
+  const changed = k => !!live && !del && JSON.stringify(live[k]) !== JSON.stringify((after || {})[k]);
+  const fields = () => d.map(z => z.f).join(', ');
+  const verbF = del ? 'supprimée' : live ? 'modifiée' : 'créée';
+  let t = '', s = col, minor = false;
+  switch (col) {
+    case 'members': {
+      const n = x.name || mNameOf(id);
+      if (!live) { t = `${n} ajouté au crew (${x.grade || 'Membre'})`; break; }
+      const L = [];
+      if (changed('name')) L.push(`renommé ${live.name} → ${after.name}`);
+      if (changed('grade')) L.push(`grade ${live.grade} → ${after.grade}`);
+      if (changed('removed')) L.push(after.removed ? 'viré du crew' : 'réintégré dans le crew');
+      if (changed('admin')) L.push(after.admin ? 'nommé admin du site' : "n'est plus admin du site");
+      if (changed('kv')) L.push(id === S.meId ? 'a changé son mot de passe' : 'mot de passe réinitialisé');
+      t = `${n} : ${L.join(' · ') || 'fiche modifiée'}`; break; }
+    case 'ops': {
+      const n = x.missionName || 'OP';
+      if (del) t = `Bilan « ${n} » supprimé`;
+      else if (live) t = `Bilan « ${n} » modifié`;
+      else { const np = (x.participants || []).length; t = `Bilan « ${n} »${x.result === 'fail' ? ' (échouée)' : ''} enregistré · ${np} participant${np > 1 ? 's' : ''}${x.total ? ' · ' + money(x.total) + ' $' : ''}${x.targetOrg ? ' · cible : ' + x.targetOrg : ''}`; }
+      break; }
+    case 'live': {
+      const n = x.missionName || 'OP';
+      if (del) t = `OP « ${n} » terminée ou annulée`; else if (!live) t = `OP « ${n} » lancée`; else { t = `OP « ${n} » en cours : sauvegarde`; minor = true; }
+      break; }
+    case 'coffre':
+      if (!live || changed('memberId')) t = `Roue tournée (${id}) : ${x.member || mNameOf(x.memberId)} remplit le coffre`;
+      else { const it = x.items || []; t = `Coffre de la semaine ${id} (${x.member || '?'}) : ${it.filter(i => i.done).length}/${it.length} cases cochées`; }
+      break;
+    case 'formations': {
+      const f = (FBY[x.formation] || {}).name || x.formation; const h = (after && after.history || []).slice(-1)[0];
+      const lab = {inscrit:'demandée', accepte:'session prévue', forme:'formé', none:'retirée'}[x.status] || x.status;
+      t = `Formation ${f} de ${x.member || mNameOf(x.memberId)} : ${h && (!live || (live.history || []).length < (after.history || []).length) ? h.act : lab}`; break; }
+    case 'sanctions':
+      t = changed('cancelled') ? `Sanction de ${x.member} annulée` : `${(SX_TYPES[x.type] || {}).label || 'Sanction'} pour ${x.member}${x.reason ? ' : ' + x.reason : ''}`; break;
+    case 'inv':
+      if (inc) t = `${placeName((live || {}).place)} : ${op.incr > 0 ? '+' : ''}${op.incr} ${(live || {}).name || 'objet'}`;
+      else if (del) t = `${x.name} retiré de la liste (${placeName(x.place)})`;
+      else if (!live) t = `${x.name} ajouté (${x.qty || 0}) · ${placeName(x.place)}`;
+      else t = `${x.name} modifié (${fields() || '—'}) · ${placeName(x.place)}`;
+      break;
+    case 'invlog': s = 'inv'; minor = true; t = `Historique du coffre : ${x.delta > 0 ? '+' : ''}${x.delta} ${x.item}`; break;
+    case 'labs': t = `${x.kind === 'vente' ? 'Vente' : 'Récolte'}${x.product ? ' « ' + x.product + ' »' : ''} ${verbF} · ${x.pochons || 0} pochons${x.kind === 'vente' && x.total ? ' · ' + money(x.total) + ' $' : ''}`; break;
+    case 'intel': t = `Fiche ${x.name || id} ${verbF}${live && !del && fields() ? ' (' + fields() + ')' : ''}`; break;
+    case 'intelimg': s = 'intel'; t = del ? 'Photo supprimée' : `Photo ajoutée${x.orgId ? ' (fiche ' + (((S.intel || []).find(o => o.id === x.orgId) || {}).name || x.orgId) + ')' : ''}`; return {s, t, p:path};
+    case 'crew':
+      if (id === 'v3') t = 'Mise à jour de sécurité : nouveaux mots de passe';
+      else if (id === 'meta') t = 'Passage aux mots de passe personnels';
+      else t = `Paramètres modifiés : ${fields() || '—'}`;
+      s = id === 'config' ? 'crew' : 'comptes'; break;
+    default: t = `${col} ${del ? 'supprimé' : live ? 'modifié' : 'créé'}`;
+  }
+  return {s, t, p:path, d, minor};
+}
+function logEntry(ops){
+  const items = (ops || []).map(logItem).filter(Boolean).sort((x, y) => (x.s === 'comptes') - (y.s === 'comptes')); // le plus parlant d'abord
+  const m = me();
+  return {at:Date.now(), byId:S.meId || '', by:m ? m.name : '?', items:items.slice(0, 40), more:Math.max(0, items.length - 40), minor:items.length > 0 && items.every(i => i.minor)};
+}
+
 /* ---------- State ---------- */
 const S = {
   view: 'missions', meId: LS.get('crew-me', null),
   config: null, cfgLoaded:false, ops: [], live: [], coffre: [], forms: [],
   wiz: null, sel: null, confirm: null, period: 'week', spinning: false, pending: false,
-  wheelRot: 0, idOpen: false, syncErr:false, slow:false, mdocs: [], vault: {}, reveal: {}, loginOpen: false, secOpen: false, myKey: null, intel: [], orgSel: null, orgQ: '', pasteSlot: null, lw: null, labs: [], labTab: 'synthese', labN: 1, labSite: null, labSub: 'prod', labEdit: null, invPlace: 'villa', invSeed: null, sanctions: [], sxType: 'avert', sxMember: '', sxReason: '', inv: [], invlog: [], invCat: 'all', invQ: '', invSel: null, mvN: 1, coffreTab: 'inv', vaultOn: false
+  wheelRot: 0, idOpen: false, syncErr:false, slow:false, mdocs: [], vault: {}, reveal: {}, loginOpen: false, secOpen: false, myKey: null, intel: [], orgSel: null, orgQ: '', pasteSlot: null, lw: null, labs: [], labTab: 'synthese', labN: 1, labSite: null, labSub: 'prod', labEdit: null, invPlace: 'villa', invSeed: null, sanctions: [], sxType: 'avert', sxMember: '', sxReason: '', inv: [], invlog: [], invCat: 'all', invQ: '', invSel: null, mvN: 1, coffreTab: 'inv', vaultOn: false,
+  logs: [], logsOn: false, logsLoaded: false, logLimit: 150, logTab: 'journal', logWho: '', logSec: '', logQ: '', logMinor: false, admPick: '', meta: null
 };
 const cfg = () => Object.assign({crewName:'Crew', crewLevel:1, members:[], coffreItems:DEFAULT_ITEMS, coffreExclude:[], coffreExcludeLast:true}, S.config || {});
 const members = () => S.mdocs.filter(m => !m.removed);
@@ -727,7 +853,7 @@ const isExec = () => { const m = me(); return !!m && (['Patron','Co-Patron','Ex�
 const isLead = isExec;
 const canManage = isBoss;
 // Peut modifier le grade / renvoyer ce membre ?
-const canEditMember = m => !!m && m.id !== S.meId && (isAdmin() || (isBoss() && !m.admin) || (isExec() && !m.admin && ['Membre','Lieutenant'].includes(m.grade)));
+const canEditMember = m => !!m && m.id !== S.meId && !(S.meta && S.meta.admin === m.id) && (isAdmin() || (isBoss() && !m.admin) || (isExec() && !m.admin && ['Membre','Lieutenant'].includes(m.grade)));
 const gradeChoices = () => isBoss() ? GRADES : ['Lieutenant','Membre'];
 const byName = n => members().find(m => m.name === n);
 const formState = (mid, fid) => { const d = S.forms.find(f => f.id === `${mid}__${fid}`); return d && d.status !== 'none' ? d.status : null; };
@@ -1400,7 +1526,7 @@ VIEWS.comptes = () => {
   if (!vaultBase()) return `<div class="empty"><strong>Mise à jour de sécurité nécessaire</strong>Recharge la page pour la lancer.</div>`;
   const ms = GRADES.flatMap(g => members().filter(m => m.grade === g));
   const rows = ms.map(m => {
-    const pw = knownPw(m); const mine = m.id === S.meId; const k = 'reset:' + m.id; const has = (m.kv || 0) >= 1;
+    const pw = knownPw(m); const mine = m.id === S.meId; const k = 'reset:' + m.id; const has = (m.kv || 0) >= 1; const locked = S.meta && S.meta.admin === m.id && S.meId !== m.id;
     let shown;
     if (mine) shown = '<span style="color:var(--muted)">Le tien (Paramètres pour le changer)</span>';
     else if (!has) shown = '<span style="color:var(--warn)">Pas encore de mot de passe</span>';
@@ -1409,7 +1535,7 @@ VIEWS.comptes = () => {
     let acts = '';
     if (pw && !mine) acts += `<button class="btn sm" data-a="reveal" data-id="${esc(m.id)}">${S.reveal[m.id] ? 'Masquer' : 'Afficher'}</button><button class="btn sm" data-a="copyacc" data-id="${esc(m.id)}">${ic('copy')}Copier</button>`;
     if (!mine && !has) acts += `<button class="btn pri sm" data-a="mkacc" data-id="${esc(m.id)}">${ic('plus')}Créer son mot de passe</button>`;
-    else if (!mine) acts += S.confirm === k ? `<button class="btn red sm" data-a="mkacc" data-id="${esc(m.id)}">Confirmer</button><button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}">Réinitialiser</button>`;
+    else if (!mine && !locked) acts += S.confirm === k ? `<button class="btn red sm" data-a="mkacc" data-id="${esc(m.id)}">Confirmer</button><button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}">Réinitialiser</button>`;
     return `<tr><td><b>${esc(m.name)}</b>${mine ? ' <span class="st-pill info">toi</span>' : ''}</td><td><span class="grade" style="--gc:${GCOL[m.grade]}">${esc(m.grade)}</span></td><td>${shown}</td><td style="text-align:right;white-space:nowrap"><div class="row" style="justify-content:flex-end;gap:6px">${acts}</div></td></tr>`;
   }).join('');
   const missing = ms.filter(m => !(m.kv >= 1) && m.id !== S.meId).length;
@@ -1418,6 +1544,93 @@ VIEWS.comptes = () => {
     <div class="panel"><div class="tbl-wrap"><table><thead><tr><th>Membre (identifiant)</th><th>Grade</th><th>Mot de passe de départ</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="hint" style="margin:12px 0 0">« Réinitialiser » crée un nouveau mot de passe et désactive l'ancien immédiatement (oubli ou fuite). Un membre viré ne peut plus rien modifier.</p></div>`;
 };
+
+/* ---------- Logs (admins) : journal de tout ce qui a été modifié + gestion des admins ---------- */
+const founderId = () => (S.meta && S.meta.admin) || null;
+const isFounder = m => !!m && m.id === founderId();
+function watchLogs(){
+  if (S.logsUnsub) { try { S.logsUnsub(); } catch(e){} }
+  S.logsOn = true;
+  S.logsUnsub = Store.watchColl('logs', l => { S.logs = l; S.logsLoaded = true; if (S.view === 'logs') scheduleRender(); }, {order:'at', dir:'desc', limit:S.logLimit});
+}
+function logMatches(e){
+  if (S.logWho && e.byId !== S.logWho) return false;
+  const items = e.items || [];
+  if (!S.logMinor && e.minor) return false;
+  if (S.logSec && !items.some(i => i.s === S.logSec)) return false;
+  if (S.logQ) { const q = S.logQ.toLowerCase(); if (!((e.by || '') + ' ' + items.map(i => i.t + ' ' + (i.d || []).map(z => z.a + ' ' + z.b).join(' ')).join(' ')).toLowerCase().includes(q)) return false; }
+  return true;
+}
+function logRow(e){
+  const items = (e.items || []).filter(i => S.logMinor || !i.minor);
+  const first = items[0] || (e.items || [])[0] || {s:'', t:'Modification'};
+  const hhmm = new Intl.DateTimeFormat('fr-FR', {hour:'2-digit', minute:'2-digit'}).format(e.at || 0);
+  const secs = [...new Set(items.map(i => i.s))].map(s => `<span class="st-pill info">${esc(LOG_SEC[s] || s)}</span>`).join('');
+  const extra = items.length + (e.more || 0) - 1;
+  const det = items.map(i => `<div class="lg-it"><div>${esc(i.t)}</div>${(i.d || []).length ? `<table class="lg-d"><tbody>${i.d.map(z => `<tr><th>${esc(z.f)}</th><td class="old">${esc(z.a)}</td><td>→</td><td>${esc(z.b)}</td></tr>`).join('')}</tbody></table>` : ''}</div>`).join('')
+    + (e.more ? `<div class="lg-it hint">… et ${e.more} autre${e.more > 1 ? 's' : ''} modification${e.more > 1 ? 's' : ''}</div>` : '');
+  const hasDet = items.length > 1 || items.some(i => (i.d || []).length);
+  return `<details class="lg"${hasDet ? '' : ' data-flat'}><summary><span class="lg-t num">${hhmm}</span><b class="lg-by">${esc(e.by || '?')}</b><span class="lg-s">${secs}</span><span class="lg-x">${esc(first.t)}${extra > 0 ? ` <small>+${extra}</small>` : ''}</span></summary>${hasDet ? `<div class="lg-det">${det}</div>` : ''}</details>`;
+}
+function logsJournal(){
+  if (!S.logsLoaded) return '<div class="empty">Chargement du journal…</div>';
+  const L = S.logs.filter(logMatches);
+  const authors = [...new Map(S.logs.map(e => [e.byId, e.by])).entries()].filter(([id]) => id);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayN = S.logs.filter(e => (e.at || 0) >= +today && !e.minor).length;
+  const top = Object.entries(S.logs.filter(e => !e.minor).reduce((o, e) => { o[e.by] = (o[e.by] || 0) + 1; return o; }, {})).sort((a, b) => b[1] - a[1])[0];
+  let day = '', body = '';
+  for (const e of L) { const d = fmtD(e.at || 0); if (d !== day) { day = d; body += `<div class="lg-day">${esc(d)}</div>`; } body += logRow(e); }
+  return `<div class="kpis" style="margin-bottom:14px">
+      <div class="kpi"><small>Aujourd'hui</small><b class="num">${todayN}</b><span>modification${todayN > 1 ? 's' : ''}</span></div>
+      <div class="kpi"><small>Le plus actif</small><b>${top ? esc(top[0]) : '—'}</b><span>${top ? top[1] + ' sur les ' + S.logs.length + ' dernières' : ''}</span></div>
+    </div>
+    <div class="toolbar" style="margin-bottom:12px">
+      <select class="inp" data-c="logwho" aria-label="Auteur"><option value="">Tout le monde</option>${authors.map(([id, n]) => `<option value="${esc(id)}" ${S.logWho === id ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
+      <select class="inp" data-c="logsec" aria-label="Partie du site"><option value="">Toutes les parties</option>${Object.entries(LOG_SEC).map(([k, v]) => `<option value="${k}" ${S.logSec === k ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select>
+      <input class="inp" id="log-q" data-c="logq" placeholder="Rechercher (nom, objet, raison…)" value="${esc(S.logQ)}" style="flex:1;min-width:160px">
+      <label class="lbl" style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-c="logminor" ${S.logMinor ? 'checked' : ''}>Sauvegardes auto</label>
+    </div>
+    <div class="panel lg-list">${body || '<div class="empty">Aucune modification ne correspond.</div>'}</div>
+    ${S.logs.length >= S.logLimit ? `<div class="row" style="justify-content:center;margin-top:12px"><button class="btn" data-a="logmore">Voir les plus anciennes</button></div>` : ''}
+    <p class="hint">Chaque modification est enregistrée en même temps qu'elle est faite : personne ne peut modifier le site sans laisser de trace, ni effacer ou changer une ligne du journal. Les mots de passe et les photos n'y sont jamais recopiés.</p>`;
+}
+function logsAdmins(){
+  const ms = GRADES.flatMap(g => members().filter(m => m.grade === g));
+  const admins = ms.filter(m => m.admin), others = ms.filter(m => !m.admin);
+  const fid = founderId();
+  const arow = m => { const mine = m.id === S.meId; const pw = knownPw(m); const k = 'unadm:' + m.id;
+    let act = '';
+    if (!mine && !(isFounder(m) && S.meId !== fid)) act = S.confirm === k ? `<button class="btn red sm" data-a="unadmin" data-id="${esc(m.id)}">Confirmer</button><button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}">Retirer admin</button>`;
+    return `<tr><td><b>${esc(m.name)}</b>${mine ? ' <span class="st-pill info">toi</span>' : ''}${isFounder(m) ? ' <span class="st-pill wait">fondateur</span>' : ''}</td><td><span class="grade" style="--gc:${GCOL[m.grade]}">${esc(m.grade)}</span></td>
+      <td>${pw && !mine ? `<code class="num">${esc(S.reveal[m.id] ? pw : '••••-••••-' + pw.slice(-4))}</code> <button class="btn sm" data-a="reveal" data-id="${esc(m.id)}">${S.reveal[m.id] ? 'Masquer' : 'Afficher'}</button><button class="btn sm" data-a="copyacc" data-id="${esc(m.id)}">${ic('copy')}Copier</button>` : '<span style="color:var(--muted)">—</span>'}</td>
+      <td style="text-align:right"><div class="row" style="justify-content:flex-end;gap:6px">${act}</div></td></tr>`; };
+  const sel = others.some(m => m.id === S.admPick) ? S.admPick : (others[0] || {}).id || '';
+  const pick = others.find(m => m.id === sel);
+  return `<div class="banner">${ic('lock')}<span>Un admin a <b>tous les droits</b> : il voit les Logs et les codes d'accès, change les grades de tout le monde, réinitialise les mots de passe et peut nommer d'autres admins. Ne le donne qu'à quelqu'un de confiance.${fid ? ' Le fondateur ne peut pas être modifié par un autre admin.' : ''}</span></div>
+    <div class="panel"><h3>Admins du site</h3><div class="tbl-wrap"><table><thead><tr><th>Admin</th><th>Grade</th><th>Nouveau mot de passe</th><th></th></tr></thead><tbody>${admins.map(arow).join('')}</tbody></table></div></div>
+    <div class="panel" style="margin-top:14px"><h3>Nommer un admin</h3>
+      ${!vaultBase() ? '<p class="hint" style="margin:0">Ton compte n\'a pas accès aux codes : demande au fondateur de nommer les admins.</p>' : others.length ? `<p class="hint">Il reçoit un <b>nouveau mot de passe</b> (qui lui donne l'accès aux codes d'accès) : il s'affiche ci-dessus, envoie-le lui en privé. Son ancien mot de passe ne marchera plus.</p>
+      <div class="row" style="align-items:flex-end"><label class="field" style="flex:1;min-width:160px">Membre<select class="inp" data-c="admpick">${others.map(m => `<option value="${esc(m.id)}" ${m.id === sel ? 'selected' : ''}>${esc(m.name)} · ${esc(m.grade)}</option>`).join('')}</select></label>
+      ${S.confirm === 'mkadm:' + sel ? `<button class="btn red" data-a="mkadmin" data-id="${esc(sel)}">Confirmer : ${esc(pick.name)} devient admin</button><button class="btn" data-a="noconfirm">Annuler</button>` : `<button class="btn pri" data-a="askconfirm" data-k="mkadm:${esc(sel)}">${ic('shield')}Nommer admin</button>`}</div>` : '<p class="hint" style="margin:0">Tout le monde est déjà admin.</p>'}
+      <p class="hint" style="margin:12px 0 0">Si tu retires un admin, il ne peut plus rien faire d'admin. Il a pu voir les mots de passe de départ : réinitialise dans « Codes d'accès » ceux des membres qui ne l'ont pas encore changé si tu n'as plus confiance.</p></div>`;
+}
+VIEWS.logs = () => {
+  if (!isAdmin()) return `<div class="empty"><strong>Réservé aux admins du site</strong></div>`;
+  if (!S.logsOn) watchLogs();
+  return `<div class="row" style="margin-bottom:14px"><div class="seg" role="group" aria-label="Logs">
+      <button data-a="logtab" data-t="journal" aria-pressed="${S.logTab === 'journal'}">Journal</button><button data-a="logtab" data-t="admins" aria-pressed="${S.logTab === 'admins'}">Admins</button></div></div>
+    ${S.logTab === 'admins' ? logsAdmins() : logsJournal()}`;
+};
+async function makeAdmin(id){
+  const m = members().find(x => x.id === id); S.confirm = null;
+  if (!isAdmin() || !m || m.admin || !vaultBase()) { render(); return; }
+  const pw = genCode();
+  const r = await passwordWrites(m, pw, {vault:S.myKey.vault}, {pwChanged:false, admin:true});
+  r.list.push({path:`${vaultBase()}/${m.id}`, data:{password:pw, kv:r.kv}});
+  if (await Store.batch(r.list)) { S.reveal[m.id] = true; toast(`${m.name} est admin. Envoie-lui son nouveau mot de passe.`); }
+  render();
+}
 
 /* ---------- Connexion ---------- */
 function openLogin(state){ S.loginOpen = true; S.loginMsg = state || ''; S.wiz = null; S.secOpen = false; renderSync(); render(); renderLogin(S.loginMsg); }
@@ -2179,6 +2392,11 @@ const A = {
     const list = S.invSeed.map(([name, cat, qty, w]) => { let id = slug(name) + (place === 'villa' ? '' : '-' + place.slice(4)); while (used.has(id)) id += '-2'; used.add(id); return {path:'inv/' + id, data:invNewDoc(name, cat, qty, w, place)}; });
     if (await Store.batch(list)) toast('Contenu importé. Corrige les quantités si besoin.'); },
   askconfirm(t){ S.confirm = t.dataset.k; S.wiz ? renderWiz() : render(); },
+  logtab(t){ S.logTab = t.dataset.t; S.confirm = null; render(); },
+  logmore(){ S.logLimit += 150; watchLogs(); },
+  mkadmin(t){ makeAdmin(t.dataset.id); },
+  unadmin(t){ const m = S.mdocs.find(x => x.id === t.dataset.id); S.confirm = null; if (!isAdmin() || !m || m.id === S.meId || (isFounder(m) && S.meId !== founderId())) { render(); return; }
+    writeMember(m.id, {admin:false}).then(ok => { if (ok) toast(`${m.name} n'est plus admin.`); }); },
   noconfirm(){ S.confirm = null; S.wiz ? renderWiz() : render(); },
   start(t){ if (!isLead()) return; S.wiz = newWiz(t.dataset.m); S.sel = null; S.confirm = null; Store.write('live/' + S.wiz.id, S.wiz); renderWiz(); },
   resume(t){ const l = S.live.find(x => x.id === t.dataset.id); if (!l) return; S.wiz = JSON.parse(JSON.stringify(l)); S.wiz.vehicles = S.wiz.vehicles || []; S.wiz.postes = S.wiz.postes || {}; S.wiz.participants = S.wiz.participants || []; S.sel = null; S.confirm = null; renderWiz(); },
@@ -2283,6 +2501,7 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.c === 'invq') { S.invQ = t.value; const g = $('#inv-grid'); if (g) g.innerHTML = gridHtml(); return; }
   if (t.dataset.c === 'sxreason') { S.sxReason = t.value; return; }
+  if (t.dataset.c === 'logq') { S.logQ = t.value; render(); const i = $('#log-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } return; }
   if (t.dataset.c === 'tgt' && S.wiz) { S.wiz.targetOrg = t.value; saveWiz(); const d = $('#disc'); if (d) d.textContent = discordText(opFromWiz(S.wiz)); return; }
   if (t.dataset.c === 'orgq') { S.orgQ = t.value; render(); const i = $('#org-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } return; }
   if (S.lw && ['lprod','lpoch','lsrcq','lextra','lshare','lmoney'].includes(t.dataset.c)) { const w = S.lw, c = t.dataset.c;
@@ -2306,6 +2525,10 @@ document.addEventListener('change', e => {
     case 'crewlevel': saveConfig({crewLevel: Math.max(1, Math.min(99, parseInt(t.value,10) || 1))}); break;
     case 'ilabel': { const it = items(); it[Number(t.dataset.i)].label = t.value.trim().slice(0,40) || 'Objet'; saveConfig({coffreItems: it}); break; }
     case 'iqty': { const it = items(); it[Number(t.dataset.i)].qty = Math.max(1, parseInt(t.value,10) || 1); saveConfig({coffreItems: it}); break; }
+    case 'logwho': S.logWho = t.value; render(); break;
+    case 'logsec': S.logSec = t.value; render(); break;
+    case 'logminor': S.logMinor = t.checked; render(); break;
+    case 'admpick': S.admPick = t.value; S.confirm = null; render(); break;
     case 'sxmember': S.sxMember = t.value; S.confirm = null; { const r = $('#sx-reason'); if (r) S.sxReason = r.value; } render(); break;
     case 'mgrade': { const m = S.mdocs.find(x => x.id === t.dataset.id); if (canEditMember(m) && gradeChoices().includes(t.value)) writeMember(m.id, {grade: t.value}); else render(); break; }
   }
@@ -2339,10 +2562,11 @@ route();
 let slowT;
 function connect(){
   Store.stopAll();
-  Object.assign(S, {config:null, cfgLoaded:false, ops:[], live:[], coffre:[], forms:[], mdocs:[], vault:{}, vaultOn:false, sanctions:[], inv:[], invlog:[], labs:[], intel:[], syncErr:false, slow:false, v3:undefined});
+  Object.assign(S, {config:null, cfgLoaded:false, ops:[], live:[], coffre:[], forms:[], mdocs:[], vault:{}, vaultOn:false, sanctions:[], inv:[], invlog:[], labs:[], intel:[], syncErr:false, slow:false, v3:undefined, logs:[], logsOn:false, logsLoaded:false, logsUnsub:null, meta:null});
   clearTimeout(slowT); slowT = setTimeout(() => { if (!Store.synced) { S.slow = true; renderSync(); } }, 10000);
   Store.watchDoc('crew/config', d => { S.config = d; S.cfgLoaded = true; scheduleRender(); });
   Store.watchDoc('crew/v3', d => { S.v3 = !!d; checkSec(); });
+  Store.watchDoc('crew/meta', d => { S.meta = d; scheduleRender(); });
   Store.watchColl('members', l => { S.mdocs = l;
     const m = S.mdocs.find(x => x.id === S.meId);
     if (Store.mode === 'fire' && S.meId && l.length && S.myKey) {

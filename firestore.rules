@@ -5,11 +5,12 @@ rules_version = '2';
 // Écriture : chaque modification est envoyée avec une « preuve » à usage unique (crews/<crew>/proofs/<id>),
 //   illisible par tous, qui contient la clé. La donnée ne garde que l'identifiant de la preuve (_p),
 //   qui ne peut pas être réutilisé. Personne ne peut donc récupérer la clé d'un autre dans les données.
+// Journal : chaque écriture doit être accompagnée de sa ligne crews/<crew>/logs/<id de la preuve>, non modifiable.
 // Changement de mot de passe / réinitialisation : le numéro de version (kv) de la fiche membre augmente,
 //   ce qui désactive aussitôt l'ancienne clé.
 //
 // Droits selon le grade (crews/<crew>/members/<id>) :
-//   Admin du site : tout, y compris les codes.     Patron / Co-Patron : tout sauf les codes.
+//   Admin du site : tout, y compris les codes et le journal (sauf modifier le fondateur).  Patron / Co-Patron : tout sauf les codes.
 //   Exécutant : OP, roue, formations, sanctions, grade et renvoi des Membres/Lieutenants, objets du coffre.
 //   Lieutenant / Membre : lecture, s'inscrire à une formation, cocher la roue à son tour,
 //   déposer/retirer dans le coffre, changer son mot de passe.
@@ -32,6 +33,10 @@ service cloud.firestore {
         && !exists(proofPath(c)) && existsAfter(proofPath(c));
     }
     function keyPath(k) { return /databases/$(database)/documents/keys/$(k); }
+    // Ligne du journal écrite avec la modification (même identifiant que la preuve).
+    function logPath(c) { return /databases/$(database)/documents/crews/$(c)/logs/$(pid()); }
+    // Le fondateur (admin d'origine, crew/meta.admin) ne peut être modifié par aucun autre admin.
+    function founder(c) { return get(/databases/$(database)/documents/crews/$(c)/crew/meta).data.get('admin', ''); }
     // Fiche "clé" de l'auteur (à n'appeler que si hasProof).
     function kdoc(c) { return get(keyPath(getAfter(proofPath(c)).data.k)).data; }
     function myId(c) { return kdoc(c).memberId; }
@@ -42,7 +47,7 @@ service cloud.firestore {
         : (m.grade in ['Patron', 'Co-Patron'] ? 3 : (m.grade == 'Exécutant' ? 2 : 1));
     }
     function lvl(c) {
-      let ok = hasProof(c) && exists(keyPath(getAfter(proofPath(c)).data.k));
+      let ok = hasProof(c) && existsAfter(logPath(c)) && exists(keyPath(getAfter(proofPath(c)).data.k));
       let k = ok ? kdoc(c) : {};
       let good = ok && k.get('crew', '') == c && k.get('revoked', false) == false;
       let m = good ? member(c, k.memberId) : {};
@@ -59,13 +64,13 @@ service cloud.firestore {
       let d = request.resource.data;
       let c = d.get('crew', '');
       let L = okCode(c) && !boot(c) ? lvl(c) : 0;
-      return k.size() >= 8 && okCode(c) && (boot(c) || L == 4
+      return k.size() >= 8 && okCode(c) && (boot(c) || (L == 4 && (d.memberId != founder(c) || myId(c) == founder(c)))
         || (L >= 1 && d.memberId == myId(c) && d.get('kv', 0) == member(c, myId(c)).get('kv', 0) + 1));
     }
     function memberUpdate(c, mid) {
       let L = lvl(c);
       let d = request.resource.data;
-      return L == 4
+      return (L == 4 && (mid != founder(c) || mid == myId(c)))
         || (L == 3 && resource.data.get('admin', false) == false && onlyKeys(['grade', 'removed', 'name', '_p', '_k']))
         || (L == 2 && canTarget(L, resource.data) && d.grade in ['Membre', 'Lieutenant'] && onlyKeys(['grade', 'removed', '_p', '_k']))
         || (L >= 1 && mid == myId(c) && onlyKeys(['kv', 'pwChanged', '_p', '_k']) && d.get('kv', 0) == resource.data.get('kv', 0) + 1);
@@ -215,6 +220,12 @@ service cloud.firestore {
         allow create: if lvl(c) >= 1 && request.resource.data.byId == myId(c) && request.resource.data.data is string;
         allow update: if lvl(c) >= 2;
         allow delete: if false;
+      }
+      // Journal : chaque modification y écrit sa ligne ; personne ne peut la modifier ni l'effacer.
+      match /logs/{id} {
+        allow read: if okCode(c);
+        allow create: if boot(c) || (id == pid() && lvl(c) >= 1 && request.resource.data.byId == myId(c));
+        allow update, delete: if false;
       }
       match /invlog/{id} {
         allow read: if okCode(c);
