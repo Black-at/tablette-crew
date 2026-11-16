@@ -172,6 +172,11 @@ select.inp{padding-right:8px}
 .kpi small{display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .kpi b{display:block;font-size:22px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .kpi span{font-size:11.5px;color:var(--muted)}
+.oe{margin-top:12px;padding-top:14px;border-top:1px solid var(--line)}
+.oe-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.oe-ps{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px;margin-top:4px}
+.oe-p{display:flex;flex-direction:column;gap:6px;padding:8px 10px;border:1px solid var(--line-2);border-radius:4px;background:#121316;color:var(--fg)}
+.oe-p.on{border-color:var(--accent)}.oe-p select{padding:5px 8px;font-size:12.5px}
 .lg-list{padding:6px 0}
 .lg-day{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:12px 16px 6px}
 details.lg{border-top:1px solid var(--line)}
@@ -547,7 +552,7 @@ const MISSIONS = [
   // Opérations du crew (hors tablette) : pas d'XP, de niveau ni de temps de recharge ; gain facultatif.
   {id:'territoire', name:'Attaque de territoire', min:4, max:23, dur:30, lvl:0, hue:0,   art:'flag', crew:true, emoji:'🏴'},
   {id:'labo-atk',   name:'Attaque de laboratoire', min:4, max:15, dur:30, lvl:0, hue:270, art:'labo', crew:true, emoji:'🧪'},
-  {id:'po-orga',    name:'PO sur Orga', min:2, max:15, dur:30, lvl:0, hue:350, art:'po', crew:true, emoji:'🎯', intel:true},
+  {id:'po-orga',    name:'PO sur Orga', min:2, max:15, dur:30, lvl:0, hue:350, art:'po', crew:true, emoji:'🎯', intel:true, money:true},
   {id:'gruppe6',  name:'Gruppe6',               min:2, max:7,  xp:2500,  dur:30, lvl:1,  cd:24,  hue:140, art:'truck'},
   {id:'bateau',   name:'Bateau de trafiquant',  min:4, max:7,  xp:1500,  dur:30, lvl:3,  cd:48,  hue:205, art:'ship'},
   {id:'flecca',   name:'Flecca Banque',         min:4, max:10, xp:3500,  dur:30, lvl:5,  cd:48,  hue:150, art:'bank'},
@@ -563,6 +568,8 @@ const MISSIONS = [
   {id:'bunker',   name:'Petit bunker',          min:7, max:23, xp:27500, dur:45, lvl:45, cd:168, hue:90,  art:'bunker'}
 ];
 const MBY = Object.fromEntries(MISSIONS.map(m => [m.id, m]));
+// Argent d'une mission : 'req' obligatoire (braquages), 'opt' facultatif (PO sur Orga), 'none' aucun (attaques).
+const payMode = mi => !mi || !mi.crew ? 'req' : mi.money ? 'opt' : 'none';
 
 const GRADES = ['Patron','Co-Patron','Exécutant','Lieutenant','Membre'];
 const GCOL = {'Patron':'var(--g-patron)','Co-Patron':'var(--g-copatron)','Exécutant':'var(--g-exec)','Lieutenant':'var(--g-lieut)','Membre':'var(--g-membre)'};
@@ -739,7 +746,7 @@ function syncError(e, what){ S.syncErr = {code: (e && e.code) || '', what: what 
 /* ---------- Journal (logs) : une ligne par modification, écrite avec la modification elle-même ---------- */
 const LOG_SEC = {members:'Membres', ops:'Bilans', live:'OP en cours', coffre:'Roue du coffre', formations:'Formations', sanctions:'Sanctions', inv:'Coffre', labs:'Laboratoires', intel:'Renseignements', crew:'Paramètres', comptes:"Codes d'accès"};
 // Champs jamais recopiés dans le journal (techniques, ou secrets comme les mots de passe et les photos).
-const LOG_SKIP = new Set(['_p','_k','_del','id','at','updatedAt','lastAt','lastById','lastBy','by','byId','password','data','k','history','vault','kv']);
+const LOG_SKIP = new Set(['_p','_k','_del','id','at','updatedAt','lastAt','lastById','lastBy','by','byId','password','data','k','history','vault','kv','editedBy','editedById','editedAt']);
 const LOG_FR = {name:'nom', grade:'grade', removed:'viré', admin:'admin', pwChanged:'mot de passe changé', crewName:'nom du crew', crewLevel:'niveau du crew',
   coffreItems:'contenu du coffre', coffreExclude:'exclus de la roue', coffreExcludeLast:'exclure le dernier', trainers:'formateurs', labSites:'labos', recipes:'recettes',
   qty:'quantité', min:'minimum', cat:'catégorie', w:'poids', icon:'icône', place:'emplacement', status:'statut', session:'session', note:'note', reason:'raison',
@@ -842,7 +849,7 @@ const S = {
   config: null, cfgLoaded:false, ops: [], live: [], coffre: [], forms: [],
   wiz: null, sel: null, confirm: null, period: 'week', spinning: false, pending: false,
   wheelRot: 0, idOpen: false, syncErr:false, slow:false, mdocs: [], vault: {}, reveal: {}, loginOpen: false, secOpen: false, myKey: null, intel: [], orgSel: null, orgQ: '', pasteSlot: null, lw: null, labs: [], labTab: 'synthese', labN: 1, labSite: null, labSub: 'prod', labEdit: null, invPlace: 'villa', invSeed: null, sanctions: [], sxType: 'avert', sxMember: '', sxReason: '', inv: [], invlog: [], invCat: 'all', invQ: '', invSel: null, mvN: 1, coffreTab: 'inv', vaultOn: false,
-  logs: [], logsOn: false, logsLoaded: false, logLimit: 150, logTab: 'journal', logWho: '', logSec: '', logQ: '', logMinor: false, admPick: '', meta: null
+  logs: [], logsOn: false, logsLoaded: false, logLimit: 150, logTab: 'journal', logWho: '', logSec: '', logQ: '', logMinor: false, admPick: '', meta: null, oe: null
 };
 const cfg = () => Object.assign({crewName:'Crew', crewLevel:1, members:[], coffreItems:DEFAULT_ITEMS, coffreExclude:[], coffreExcludeLast:true}, S.config || {});
 const members = () => S.mdocs.filter(m => !m.removed);
@@ -1018,7 +1025,7 @@ function autoVehicles(w){
   if (added) toast(`${added} véhicule${added>1?'s':''} ajouté${added>1?'s':''} pour placer tout le monde.`);
 }
 function opFromWiz(w){
-  return {missionId:w.missionId, missionName:w.missionName, result:w.result, total: w.result==='fail' || (MBY[w.missionId] || {}).crew ? 0 : parseMoney(w.total),
+  return {missionId:w.missionId, missionName:w.missionName, result:w.result, total: w.result==='fail' || payMode(MBY[w.missionId]) === 'none' ? 0 : parseMoney(w.total),
     participants: w.participants.map(n => ({name:n, poste: w.postes[n] || null})), withPostes: w.withPostes, targetOrg: (w.targetOrg || '').trim()};
 }
 function discordText(op){
@@ -1027,7 +1034,7 @@ function discordText(op){
   const L = [`# ${ok ? (mi.emoji || '💵') : '❌'} ${op.missionName}${ok ? '' : ' (échouée)'}`, '',
     `Détail : ${op.participants.map(p => p.name).join(', ') || '—'}`];
   if (op.targetOrg) L.push(`Organisation visée : ${op.targetOrg}`);
-  if (!mi.crew) L.push(`Total gagné = ${money(op.total)} $`);
+  if (payMode(mi) === 'req' || (payMode(mi) === 'opt' && op.total)) L.push(`Total gagné = ${money(op.total)} $`);
   if (op.withPostes) {
     const rows = POSTES.map(p => { const n = op.participants.filter(x => x.poste === p.id).map(x => x.name); return n.length ? `${p.emoji} ${p.name} : ${n.join(', ')}` : null; }).filter(Boolean);
     if (rows.length) L.push('', 'Postes :', ...rows);
@@ -1129,8 +1136,8 @@ function stepBilan(w, m){
           <div class="seg" role="group" aria-label="Résultat"><button data-a="wresult" data-r="ok" aria-pressed="${w.result!=='fail'}">Réussie</button><button data-a="wresult" data-r="fail" aria-pressed="${w.result==='fail'}">Échouée</button></div></div>
         ${m.intel ? `<label class="field" for="tgt">Organisation visée (facultatif)<input class="inp" id="tgt" data-c="tgt" list="tgt-list" maxlength="40" placeholder="Nom de l'orga prise en PO" value="${esc(w.targetOrg || '')}"><datalist id="tgt-list">${S.intel.map(o => `<option value="${esc(o.name)}">`).join('')}</datalist></label>
           <p class="hint" style="margin:0">À l'enregistrement, sa fiche est créée ou complétée dans <b>Renseignements</b> : ajoutes-y ensuite les infos récoltées.</p>` : ''}
-        ${m.crew ? `<p class="hint" style="margin:0">Pas d'argent à déclarer pour cette mission : enregistre directement le bilan.</p>` : ''}
-        ${w.result !== 'fail' && !m.crew ? `<label class="field" for="total">Total gagné ($)
+        ${payMode(m) === 'none' ? `<p class="hint" style="margin:0">Pas d'argent à déclarer pour cette mission : enregistre directement le bilan.</p>` : ''}
+        ${w.result !== 'fail' && payMode(m) !== 'none' ? `<label class="field" for="total">Total gagné ($)${payMode(m) === 'opt' ? ' — facultatif, si vous avez récupéré de l\'argent' : ''}
           <input class="inp money" id="total" data-c="total" inputmode="numeric" autocomplete="off" placeholder="1.733.650" value="${esc(w.total ? money(parseMoney(w.total)) : '')}"></label>
         <div class="kpi"><small>Part par personne</small><b id="share">${money(share)} $</b><span>Total divisé par ${n} participant${n>1?'s':''} — indicatif, en attendant les paies.</span></div>` : ''}
         <label class="check"><input type="checkbox" id="withp" data-c="withp" ${w.withPostes?'checked':''}>Ajouter les postes dans le message</label>
@@ -1173,12 +1180,56 @@ function opCard(o){
   const parts = (o.participants||[]).map(p => `<span class="pc" style="--pc:${p.poste?PBY[p.poste].col:'var(--dim)'}">${esc(p.name)}</span>`).join('');
   const k = 'del:' + o.id;
   return `<article class="opc ${fail?'fail':''}" style="--h:${m.hue}"><span class="bar"></span><div class="in">
-    <div class="op-h"><h4>${esc(o.missionName)}</h4><span class="st-pill ${fail?'fail':'ok'}">${fail?'Échouée':'Réussie'}</span><span class="meta">${fmtDT(o.endedAt)} · lancée par ${esc(o.by||'?')}</span>${(MBY[o.missionId] || {}).crew ? '' : `<span class="tot">${money(o.total)} $</span>`}</div>
+    <div class="op-h"><h4>${esc(o.missionName)}</h4><span class="st-pill ${fail?'fail':'ok'}">${fail?'Échouée':'Réussie'}</span><span class="meta">${fmtDT(o.endedAt)} · lancée par ${esc(o.by||'?')}${o.editedBy ? ` · modifié par ${esc(o.editedBy)}` : ''}</span>${payMode(MBY[o.missionId]) === 'req' || (payMode(MBY[o.missionId]) === 'opt' && o.total) ? `<span class="tot">${money(o.total)} $</span>` : ''}</div>
+    ${o.targetOrg ? `<div class="meta" style="font-size:12px;color:var(--muted)">Organisation visée : <b style="color:var(--fg)">${esc(o.targetOrg)}</b></div>` : ''}
     <div class="chips">${parts}</div>
     <div class="row"><span class="meta" style="font-size:11.5px;color:var(--muted)">${(o.participants||[]).length} participants${!fail && o.total && o.participants && o.participants.length ? ` · ${money(Math.floor(o.total/o.participants.length))} $ par tête` : ''}</span><span class="spacer"></span>
       <button class="btn sm" data-a="copyop" data-id="${esc(o.id)}">${ic('copy')}Copier pour Discord</button>
+      ${isAdmin() ? `<button class="btn ghost sm" data-a="opedit" data-id="${esc(o.id)}" aria-pressed="${S.oe && S.oe.id === o.id}">${ic('gear')}Modifier</button>` : ''}
       ${canManage() ? (S.confirm === k ? `<button class="btn red sm" data-a="delop" data-id="${esc(o.id)}">Confirmer la suppression</button><button class="btn sm" data-a="noconfirm">Garder</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}" aria-label="Supprimer ce bilan">${ic('trash')}</button>`) : ''}
-    </div></div></article>`;
+    </div>${S.oe && S.oe.id === o.id && isAdmin() ? opEditForm() : ''}</div></article>`;
+}
+// Modification d'un bilan par un admin (mission, résultat, argent, date, participants et postes, orga visée).
+const dtLocal = ts => { const d = new Date(ts || Date.now()); const z = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`; };
+function opEditStart(o){
+  const parts = {}; (o.participants || []).forEach(p => { parts[p.name] = p.poste || ''; });
+  S.oe = {id:o.id, missionId:o.missionId, result:o.result === 'fail' ? 'fail' : 'ok', total:o.total ? money(o.total) : '', at:dtLocal(o.endedAt), targetOrg:o.targetOrg || '', parts, order:Object.keys(parts)};
+}
+function opEditForm(){
+  const e = S.oe; const mi = MBY[e.missionId] || {}; const pm = payMode(mi);
+  const names = [...new Set(members().map(m => m.name).concat(e.order))];
+  const pick = names.map(n => { const on = n in e.parts; return `<div class="oe-p ${on ? 'on' : ''}"><label class="check" style="margin:0"><input type="checkbox" data-c="oep" data-n="${esc(n)}" ${on ? 'checked' : ''}>${esc(n)}${byName(n) ? '' : ' <small style="color:var(--muted)">(invité)</small>'}</label>
+    ${on ? `<select class="inp" data-c="oepp" data-n="${esc(n)}" aria-label="Poste de ${esc(n)}"><option value="">Sans poste</option>${POSTES.map(p => `<option value="${p.id}" ${e.parts[n] === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>` : ''}</div>`; }).join('');
+  return `<div class="oe stack" style="gap:12px">
+    <div class="oe-g">
+      <label class="field">Mission<select class="inp" data-c="oe" data-f="missionId">${MISSIONS.map(m => `<option value="${m.id}" ${m.id === e.missionId ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>
+      <label class="field">Résultat<select class="inp" data-c="oe" data-f="result"><option value="ok" ${e.result !== 'fail' ? 'selected' : ''}>Réussie</option><option value="fail" ${e.result === 'fail' ? 'selected' : ''}>Échouée</option></select></label>
+      <label class="field">Date et heure<input class="inp" type="datetime-local" data-c="oe" data-f="at" value="${esc(e.at)}"></label>
+      ${pm !== 'none' && e.result !== 'fail' ? `<label class="field">Total gagné ($)${pm === 'opt' ? ' — facultatif' : ''}<input class="inp" id="oe-total" data-c="oe" data-f="total" inputmode="numeric" value="${esc(e.total)}" placeholder="0"></label>` : ''}
+      ${mi.intel ? `<label class="field">Organisation visée<input class="inp" data-c="oe" data-f="targetOrg" maxlength="40" value="${esc(e.targetOrg)}"></label>` : ''}
+    </div>
+    <div class="field">Participants (${Object.keys(e.parts).length})<div class="oe-ps">${pick}</div></div>
+    <div class="row" style="align-items:flex-end"><label class="field" style="flex:1;min-width:150px">Ajouter un invité<input class="inp" id="oe-g" maxlength="30" placeholder="Nom"></label><button class="btn sm" data-a="opguest">${ic('plus')}Ajouter</button></div>
+    <div class="row"><button class="btn pri" data-a="opsave">${ic('check')}Enregistrer les modifications</button><button class="btn" data-a="opcancel">Annuler</button></div>
+  </div>`;
+}
+function opEditSave(){
+  const e = S.oe; const cur = S.ops.find(o => o.id === e.id); if (!e || !cur || !isAdmin()) return;
+  const mi = MBY[e.missionId] || {}; const pm = payMode(mi);
+  const total = e.result === 'fail' || pm === 'none' ? 0 : parseMoney(e.total);
+  if (pm === 'req' && e.result !== 'fail' && !total) { toast('Indique le total gagné.'); return; }
+  const names = e.order.filter(n => n in e.parts);
+  if (!names.length) { toast('Il faut au moins un participant.'); return; }
+  const at = new Date(e.at).getTime();
+  const op = Object.assign({}, cur, {missionId:e.missionId, missionName:mi.name || cur.missionName, result:e.result, total,
+    participants:names.map(n => ({name:n, poste:e.parts[n] || null})), targetOrg:mi.intel ? e.targetOrg.trim().slice(0, 40) : (cur.targetOrg || ''),
+    endedAt: at > 0 ? at : cur.endedAt, editedBy:me().name, editedById:me().id, editedAt:Date.now()});
+  if (op.vehicles) op.vehicles = op.vehicles.map(v => Object.assign({}, v, {slots:(v.slots || []).map(x => x && names.includes(x) ? x : null)}));
+  if (names.some(n => e.parts[n]) && op.withPostes === undefined) op.withPostes = true;
+  delete op.id;
+  const ix = S.ops.findIndex(o => o.id === e.id); S.ops[ix] = Object.assign({}, op, {id:e.id});
+  S.oe = null; render();
+  Store.write('ops/' + e.id, op).then(ok => { if (ok) toast('Bilan modifié.'); });
 }
 VIEWS.bilans = () => {
   const ops = S.ops.filter(o => inPeriod(o.endedAt)).sort((a,b) => b.endedAt - a.endedAt);
@@ -2143,10 +2194,9 @@ function labsMain(){
     </div></div>`;
 }
 VIEWS.labos = () => {
-  const tab = S.labTab || 'synthese';
+  const tab = S.labTab === 'coffre' ? 'coffre' : 'synthese';
   const head = `<div class="row" style="margin-bottom:14px"><div class="seg" role="group" aria-label="Laboratoire">
-      <button data-a="labtab" data-t="synthese" aria-pressed="${tab==='synthese'}">Récoltes et ventes</button><button data-a="labtab" data-t="coffre" aria-pressed="${tab==='coffre'}">Coffre du labo</button><button data-a="labtab" data-t="culture" aria-pressed="${tab==='culture'}">Culture</button></div></div>`;
-  if (tab === 'culture') return head + `<div class="empty"><strong>Laboratoires de culture</strong>Bientôt : explique-moi comment marchent vos cultures et je les ajoute ici.</div>`;
+      <button data-a="labtab" data-t="synthese" aria-pressed="${tab==='synthese'}">Récoltes et ventes</button><button data-a="labtab" data-t="coffre" aria-pressed="${tab==='coffre'}">Coffre du labo</button></div></div>`;
   if (tab === 'coffre') { const site = (cfg().labSites || [])[0] || {id:'roxwood', name:'Labo', cap:1500};
     return head + invView('lab:' + site.id, {title:site.name, sub:'Coffre du labo de synthèse', cap:site.cap || 1500, seed:LAB_SEED, seedLabel:'Remplir avec le contenu de ta capture du coffre du labo (acide, catalyseur, base opioïde, solvant, pochons, méthylamine…), puis corriger les quantités.'}); }
   return head + labsMain();
@@ -2424,7 +2474,7 @@ const A = {
   copywiz(){ const txt = discordText(opFromWiz(S.wiz)); copy(txt, $('#disc')); },
   wsave(){
     const w = S.wiz; const total = parseMoney(w.total);
-    if (w.result !== 'fail' && !total && !(MBY[w.missionId] || {}).crew) { toast('Indique le total gagné avant d\'enregistrer.'); const i = $('#total'); if (i) i.focus(); return; }
+    if (w.result !== 'fail' && !total && payMode(MBY[w.missionId]) === 'req') { toast('Indique le total gagné avant d\'enregistrer.'); const i = $('#total'); if (i) i.focus(); return; }
     const op = Object.assign(opFromWiz(w), {startedAt:w.startedAt, endedAt:Date.now(), by:w.by, vehicles:w.vehicles.map(v => ({seats:v.seats, slots:v.slots}))});
     clearTimeout(wizSaveT);
     S.ops.push(Object.assign({}, op, {id:w.id}));
@@ -2438,6 +2488,10 @@ const A = {
   wcancel(){ clearTimeout(wizSaveT); const id = S.wiz.id; S.live = S.live.filter(l => l.id !== id); Store.write('live/' + id, null); S.wiz = null; S.sel = null; S.confirm = null; renderWiz(); render(); toast('OP annulée.'); },
   period(t){ S.period = t.dataset.p; render(); },
   copyop(t){ const o = S.ops.find(x => x.id === t.dataset.id); if (o) copy(discordText(o), null); },
+  opedit(t){ const o = S.ops.find(x => x.id === t.dataset.id); if (!o || !isAdmin()) return; if (S.oe && S.oe.id === o.id) S.oe = null; else opEditStart(o); render(); },
+  opcancel(){ S.oe = null; render(); },
+  opsave(){ opEditSave(); },
+  opguest(){ const i = $('#oe-g'); const n = ((i && i.value) || '').trim().slice(0, 30); if (!n || !S.oe) return; if (!(n in S.oe.parts)) { S.oe.parts[n] = ''; if (!S.oe.order.includes(n)) S.oe.order.push(n); } render(); },
   delop(t){ const id = t.dataset.id; S.ops = S.ops.filter(o => o.id !== id); Store.write('ops/' + id, null); S.confirm = null; render(); toast('Bilan supprimé.'); },
   spin(){ if (isLead()) spin(); },
   cexcl(t){ if (!isLead()) return; const id = t.dataset.id; const ex = new Set(cfg().coffreExclude || []); ex.has(id) ? ex.delete(id) : ex.add(id); saveConfig({coffreExclude:[...ex]}); },
@@ -2494,6 +2548,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.id === 'ia-name') { e.preventDefault(); A.invadd(); }
   if (e.key === 'Enter' && e.target.id === 'lguest-in') { e.preventDefault(); A.lguest(); }
   if (e.key === 'Enter' && e.target.id === 'org-new') { e.preventDefault(); A.orgnew(); }
+  if (e.key === 'Enter' && e.target.id === 'oe-g') { e.preventDefault(); A.opguest(); }
   if (e.key === 'Escape') A.lbclose();
 });
 document.addEventListener('toggle', e => { const d = e.target; if (d && d.dataset && d.dataset.edit) S.labEdit = d.open ? d.dataset.edit : (S.labEdit === d.dataset.edit ? null : S.labEdit); }, true);
@@ -2501,6 +2556,7 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.c === 'invq') { S.invQ = t.value; const g = $('#inv-grid'); if (g) g.innerHTML = gridHtml(); return; }
   if (t.dataset.c === 'sxreason') { S.sxReason = t.value; return; }
+  if (t.dataset.c === 'oe' && S.oe && ['total', 'targetOrg'].includes(t.dataset.f)) { S.oe[t.dataset.f] = t.value; return; }
   if (t.dataset.c === 'logq') { S.logQ = t.value; render(); const i = $('#log-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } return; }
   if (t.dataset.c === 'tgt' && S.wiz) { S.wiz.targetOrg = t.value; saveWiz(); const d = $('#disc'); if (d) d.textContent = discordText(opFromWiz(S.wiz)); return; }
   if (t.dataset.c === 'orgq') { S.orgQ = t.value; render(); const i = $('#org-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } return; }
@@ -2525,6 +2581,9 @@ document.addEventListener('change', e => {
     case 'crewlevel': saveConfig({crewLevel: Math.max(1, Math.min(99, parseInt(t.value,10) || 1))}); break;
     case 'ilabel': { const it = items(); it[Number(t.dataset.i)].label = t.value.trim().slice(0,40) || 'Objet'; saveConfig({coffreItems: it}); break; }
     case 'iqty': { const it = items(); it[Number(t.dataset.i)].qty = Math.max(1, parseInt(t.value,10) || 1); saveConfig({coffreItems: it}); break; }
+    case 'oe': if (S.oe) { S.oe[t.dataset.f] = t.dataset.f === 'total' ? (parseMoney(t.value) ? money(parseMoney(t.value)) : '') : t.value; render(); } break;
+    case 'oep': if (S.oe) { const n = t.dataset.n; if (t.checked) { S.oe.parts[n] = ''; if (!S.oe.order.includes(n)) S.oe.order.push(n); } else delete S.oe.parts[n]; render(); } break;
+    case 'oepp': if (S.oe) { S.oe.parts[t.dataset.n] = t.value; } break;
     case 'logwho': S.logWho = t.value; render(); break;
     case 'logsec': S.logSec = t.value; render(); break;
     case 'logminor': S.logMinor = t.checked; render(); break;

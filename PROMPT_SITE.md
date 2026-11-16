@@ -102,13 +102,13 @@ Un **formateur désigné** (même Membre) peut accepter, refuser et valider les 
 ## 5. Les pages
 
 ### Missions
-- **15 missions** : 3 opérations du crew (**Attaque de territoire**, **Attaque de laboratoire**, **PO sur Orga** : pas d'argent, pas de niveau, pas de temps de recharge) et 12 missions de la tablette, de **Gruppe6** (niveau 1, 2-7 joueurs, +2 500 XP, recharge 24 h) à **Petit bunker** (niveau 45, 7-23 joueurs, +27 500 XP, recharge 168 h). Les autres sont Bateau de trafiquant, Flecca, Pine, Bijouterie, Roxwood, Paleto, Braquage de train, Yacht, Pacific Standard, Humane Labs et Plateforme pétrolière.
+- **15 missions** : 3 opérations du crew (**Attaque de territoire**, **Attaque de laboratoire**, **PO sur Orga** : pas de niveau ni de temps de recharge ; pas d'argent pour les attaques, argent **facultatif** pour la PO sur Orga) et 12 missions de la tablette, de **Gruppe6** (niveau 1, 2-7 joueurs, +2 500 XP, recharge 24 h) à **Petit bunker** (niveau 45, 7-23 joueurs, +27 500 XP, recharge 168 h). Les autres sont Bateau de trafiquant, Flecca, Pine, Bijouterie, Roxwood, Paleto, Braquage de train, Yacht, Pacific Standard, Humane Labs et Plateforme pétrolière.
 - Les missions au-dessus du **niveau du crew** (réglable, 22 par défaut) sont verrouillées. Une mission faite récemment affiche « En recharge · encore X h ».
 - **« Commencer »** (Exécutant et plus) ouvre un assistant en 4 étapes :
   1. **Équipe** : on coche les membres présents (regroupés par grade, avec leurs badges de formation) et on peut ajouter des renforts extérieurs. Le site prévient si le nombre est hors de la fourchette de la mission.
   2. **Postes** : Négociateur, Surveillance otages, Braquage ou Polyvalent. Le bouton **Auto** répartit au hasard selon des proportions (≥ 2 joueurs : 1 négociateur, 2 à partir de 10 ; ≥ 3 : 25 % surveillance ; ≥ 6 : 15 % polyvalent ; le reste au braquage). Une option donne la priorité aux membres formés.
   3. **Véhicules** : on choisit le nombre de véhicules, et 4 ou 5 places pour chacun. Un schéma de voiture vue de dessus montre les sièges (Conducteur, Passager, Arrière G, M, D). On place les gens en touchant un nom puis une place, ou par glisser-déposer. **Auto** place tout le monde au hasard (formés « Conducteur » au volant en priorité) et ajoute des véhicules s'il manque des places.
-  4. **Bilan** : Réussie ou Échouée et total gagné (sauf pour les opérations du crew), part par personne, organisation visée (pour une PO), puis le **message Discord** avec un bouton Copier.
+  4. **Bilan** : Réussie ou Échouée et total gagné (obligatoire pour les braquages, facultatif pour la PO sur Orga, absent pour les attaques ; `payMode(mission)` = req / opt / none), part par personne, organisation visée (pour une PO), puis le **message Discord** avec un bouton Copier.
 - Pendant l'OP, elle apparaît **« OP en cours »** chez tout le monde, avec le poste et la place de chacun. Elle est sauvegardée en continu, un Exécutant peut la reprendre, et on peut l'annuler.
 - Format du message Discord :
 ```
@@ -126,6 +126,7 @@ Postes :
 - Historique par semaine, mois ou depuis le début : missions, **récoltes et ventes** de labo.
 - Compteurs : total gagné (missions + ventes), OP réussies, membres actifs, meilleure OP.
 - Classement de participation : nombre d'activités et gains estimés.
+- **Admins** : bouton « Modifier » sur chaque bilan d'OP (mission, résultat, date et heure, total, organisation visée, participants et postes, ajout d'invités). Le bilan affiche « modifié par X » et la modification apparaît dans les Logs. Les récoltes et ventes se corrigent avec « Corriger » (Exécutants et plus).
 - Sur chaque entrée : « Copier pour Discord » ; la suppression est réservée au Patron et au Co-Patron.
 
 ### Coffre (villa), 2 onglets
@@ -143,7 +144,7 @@ Postes :
   - la personne tirée la semaine précédente est exclue automatiquement, et l'on peut exclure d'autres membres ;
   - historique « Rempli / Incomplet ».
 
-### Laboratoires, 3 onglets
+### Laboratoires, 2 onglets
 - **Récoltes et ventes**, en assistants comme les missions :
   - **Récolte** (2 étapes) : présents, puis produit (Fentanyl) et nombre de pochons créés. Message :
     `# 🧪 Récolte de fentanyl / Détail : … / Pochons créés = 44`. Les pochons vont dans le **stock à vendre**.
@@ -155,7 +156,6 @@ Postes :
   - Compteurs (stock, créés, vendus, argent), classements Création et Ventes.
   - Les Exécutants peuvent **corriger** (l'assistant se rouvre prérempli) ou supprimer. Une récolte déjà en partie vendue ne peut pas être supprimée.
 - **Coffre du labo** : le même inventaire, séparé (champ `place: 'lab:<id>'`, ex. coffre « Roxwood » de 1 500 kg avec acide, catalyseur, base opioïde, solvant, pochons, méthylamine…).
-- **Culture** : « Bientôt ».
 
 ### Renseignements
 - Une **fiche par organisation adverse**, triée par menace :
@@ -197,7 +197,7 @@ Postes :
 - **Admins** : liste des admins (badge fondateur), « Nommer admin » (nouveau mot de passe généré avec l'accès aux codes, affiché pour être envoyé), « Retirer admin ». On ne peut pas changer son propre statut.
 
 ### Bientôt
-Paies, et laboratoires de culture.
+Paies.
 
 ---
 
