@@ -181,7 +181,8 @@ Postes :
 - À la connexion, tant qu'elle n'est pas complète, une fenêtre demande : **prénom et nom (RP)**, **numéro de téléphone (RP)** et la **photo de la carte d'identité** (fichier, glisser-déposer ou Ctrl+V). « Plus tard » la ferme jusqu'au prochain chargement ; un bandeau reste affiché.
 - `askedAt` = première demande. Sans carte d'identité : **rappel à l'ordre automatique après 24 h**, **avertissement automatique après 3 jours** (sanctions `autoid-<id>-rappel` / `autoid-<id>-avert`, `auto: 'id'`, par « Tablette (automatique) »). Dès que la fiche est complète, elles sont **annulées automatiquement**. Les admins n'en reçoivent pas. L'avertissement automatique ne vire pas tout seul.
 - Ces sanctions sont posées par le membre lui-même (règle `auto == 'id'`) ou par un Exécutant et plus connecté.
-- Patron, Co-Patron et admins : colonne « Fiche RP » dans Membres (statut + « Voir » : nom RP, téléphone, carte d'identité agrandissable) et bandeau « X membres sans fiche RP » avec « Copier le rappel » pour Discord.
+- Patron, Co-Patron et admins : statut dans la colonne « Fiche RP » de Membres et bouton **« Panel fiche RP »** : toutes les fiches en cartes (carte d'identité agrandissable, nom RP, téléphone, grade, statut), filtres Toutes / Manquantes / Complètes, recherche, « Copier le rappel » pour Discord. Bandeau « X membres sans fiche RP ».
+- **Réinitialiser la fiche** (admins seulement, avec confirmation) : vide la fiche, retire l'ancienne photo, relance le délai de 24 h / 3 jours (`cycle` + 1 : les sanctions automatiques peuvent être redonnées, id `autoid-<id>-<type>-c<cycle>`).
 - Chacun voit et modifie sa fiche dans Paramètres → Mon profil.
 
 ### Membres

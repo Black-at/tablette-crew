@@ -425,6 +425,16 @@ details.edit summary{cursor:pointer;font-size:12.5px;color:var(--accent-hi)}
 .prn > span{flex:1;min-width:120px}
 .prn small{display:block;color:var(--muted);font-size:11.5px}
 .prn .inp{width:140px}
+.idm.rpp{max-width:1100px}
+.rpgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.rpcard{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line-2);border-radius:6px;overflow:hidden}
+.rpcard .rpimg .imgthumb img{width:100%;height:170px;max-height:none;object-fit:cover;border-radius:0}
+.rpcard .rpimg .imgph{min-height:170px;background:rgba(0,0,0,.25)}
+.rpinfo{display:flex;flex-direction:column;gap:6px;padding:12px 14px}
+.rpname{font-size:15px}
+.rpline{display:flex;align-items:center;gap:8px;font-size:13px;color:#c9ccd2}
+.rpline .ic{width:14px;height:14px;color:var(--muted)}
+.rpinfo small{color:var(--muted);font-size:11.5px}
 .opc.rec .bar{background:var(--p-neg)}
 
 .fline{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:5px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--pc)}
@@ -778,7 +788,7 @@ const LOG_FR = {name:'nom', grade:'grade', removed:'viré', admin:'admin', pwCha
   coffreItems:'contenu du coffre', coffreExclude:'exclus de la roue', coffreExcludeLast:'exclure le dernier', trainers:'formateurs', labSites:'labos', recipes:'recettes',
   qty:'quantité', min:'minimum', cat:'catégorie', w:'poids', icon:'icône', place:'emplacement', status:'statut', session:'session', note:'note', reason:'raison',
   cancelled:'annulée', total:'total', participants:'participants', result:'résultat', missionName:'mission', targetOrg:'organisation visée', pochons:'pochons',
-  first:'prénom RP', last:'nom RP', phone:'téléphone RP', img:"carte d'identité", askedAt:'fiche demandée', kickAt:'déconnexion générale', kickKeep:'restés connectés', auto:'automatique',
+  cycle:'relance', resetAt:'réinitialisée le', resetBy:'réinitialisée par', first:'prénom RP', last:'nom RP', phone:'téléphone RP', img:"carte d'identité", askedAt:'fiche demandée', kickAt:'déconnexion générale', kickKeep:'restés connectés', auto:'automatique',
   product:'produit', unit:'unité', perPerson:'par personne', source:'origine', sellers:'vendeurs', sources:'récoltes', color:'couleur', radio:'radio', threat:'menace', boss:'patron', villa:'villa', people:'membres connus',
   notes:'journal', claims:'revendique', items:'cases', member:'membre', memberId:'membre', trainer:'formateur', postes:'postes', vehicles:'véhicules'};
 const mNameOf = id => { const m = S.mdocs.find(x => x.id === id); return m ? m.name : (id || '?'); };
@@ -854,7 +864,7 @@ function logItem(op){
       break;
     case 'invlog': s = 'inv'; minor = true; t = `Historique du coffre : ${x.delta > 0 ? '+' : ''}${x.delta} ${x.item}`; break;
     case 'labs': t = `${x.kind === 'vente' ? 'Vente' : x.source === 'hotspot' ? 'Récolte points chauds' : 'Récolte'}${x.product ? ' « ' + x.product + ' »' : ''} ${verbF}${live && !del && changed('product') ? ' (renommée, avant : ' + live.product + ')' : ''} · ${x.pochons || 0} ${x.unit || 'pochons'}${x.kind === 'vente' && x.total ? ' · ' + money(x.total) + ' $' : ''}`; break;
-    case 'ident': t = `Fiche RP de ${mNameOf(id)} ${!live ? 'demandée' : changed('img') ? ": carte d'identité ajoutée" : 'modifiée'}${live && !changed('img') && fields() ? ' (' + fields() + ')' : ''}`; break;
+    case 'ident': t = `Fiche RP de ${mNameOf(id)} ${!live ? 'demandée' : changed('resetAt') ? 'réinitialisée' : changed('img') && after.img ? ": carte d'identité ajoutée" : 'modifiée'}${live && !changed('img') && fields() ? ' (' + fields() + ')' : ''}`; break;
     case 'intel': t = `Fiche ${x.name || id} ${verbF}${live && !del && fields() ? ' (' + fields() + ')' : ''}`; break;
     case 'intelimg': s = 'intel'; t = del ? 'Photo supprimée' : `Photo ajoutée${x.orgId ? ' (fiche ' + (((S.intel || []).find(o => o.id === x.orgId) || {}).name || x.orgId) + ')' : ''}`; return {s, t, p:path};
     case 'crew':
@@ -879,7 +889,7 @@ const S = {
   wiz: null, sel: null, confirm: null, period: 'week', spinning: false, pending: false,
   wheelRot: 0, idOpen: false, syncErr:false, slow:false, mdocs: [], vault: {}, reveal: {}, loginOpen: false, secOpen: false, myKey: null, intel: [], orgSel: null, orgQ: '', pasteSlot: null, lw: null, labs: [], labTab: 'synthese', labN: 1, labSite: null, labSub: 'prod', labEdit: null, invPlace: 'villa', invSeed: null, sanctions: [], sxType: 'avert', sxMember: '', sxReason: '', inv: [], invlog: [], invCat: 'all', invQ: '', invSel: null, mvN: 1, coffreTab: 'inv', vaultOn: false,
   logs: [], logsOn: false, logsLoaded: false, logLimit: 150, logTab: 'journal', logWho: '', logSec: '', logQ: '', logMinor: false, admPick: '', meta: null, oe: null,
-  ident: [], identLoaded: false, sxLoaded: false, identOpen: false, identSkip: false, identSig: '', identView: null, idDraft: {}, askWritten: false, freshLogin: false
+  ident: [], identLoaded: false, sxLoaded: false, identOpen: false, identSkip: false, identSig: '', identView: null, rpOpen: false, rpFilter: 'all', rpQ: '', idDraft: {}, askWritten: false, freshLogin: false
 };
 const cfg = () => Object.assign({crewName:'Crew', crewLevel:1, members:[], coffreItems:DEFAULT_ITEMS, coffreExclude:[], coffreExcludeLast:true}, S.config || {});
 const members = () => S.mdocs.filter(m => !m.removed);
@@ -940,7 +950,7 @@ function render(){
   const v = VIEWS[S.view] || VIEWS.missions;
   $('#view').innerHTML = v();
   if (S.view === 'coffre' && S.coffreTab === 'roue') drawWheel();
-  renderIdent();
+  renderIdent(); renderRpPanel();
 }
 function scheduleRender(){
   if (S.spinning) { S.pending = true; return; }
@@ -1518,13 +1528,13 @@ VIEWS.membres = () => {
       <td>${can ? `<select class="inp" data-c="mgrade" data-id="${esc(m.id)}" id="g-${esc(m.id)}" aria-label="Grade de ${esc(m.name)}">${choices.map(g => `<option ${g===m.grade?'selected':''} value="${g}">${GLABEL[g]||g}</option>`).join('')}</select>` : `<span class="grade" style="--gc:${GCOL[m.grade]}">${esc(GLABEL[m.grade]||m.grade)}</span>`}</td>
       <td>${fBadges(m.name) || '<span style="color:var(--dim)">—</span>'}</td>
       <td class="num">${opsCount(m.name)}</td><td class="num">${coffreCount(m.id)}</td><td class="num" style="color:${warnCount(m.id) ? 'var(--danger)' : 'var(--dim)'}">${warnCount(m.id)}/2</td>
-      ${boss ? (() => { const st = identStatus(m); return `<td style="white-space:nowrap"><span class="st-pill ${st.cls}">${esc(st.t)}</span> <button class="btn ghost sm" data-a="idview" data-id="${esc(m.id)}" aria-pressed="${S.identView === m.id}">${S.identView === m.id ? 'Masquer' : 'Voir'}</button></td>`; })() : ''}
-      <td style="text-align:right;white-space:nowrap">${can ? (S.confirm === k ? `<button class="btn red sm" data-a="mdel" data-id="${esc(m.id)}">Virer du crew</button> <button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}" aria-label="Virer ${esc(m.name)}">${ic('trash')}</button>`) : ''}</td></tr>${boss && S.identView === m.id ? identRow(m) : ''}`;
+      ${boss ? (() => { const st = identStatus(m); return `<td style="white-space:nowrap"><span class="st-pill ${st.cls}">${esc(st.t)}</span></td>`; })() : ''}
+      <td style="text-align:right;white-space:nowrap">${can ? (S.confirm === k ? `<button class="btn red sm" data-a="mdel" data-id="${esc(m.id)}">Virer du crew</button> <button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}" aria-label="Virer ${esc(m.name)}">${ic('trash')}</button>`) : ''}</td></tr>`;
   }).join('');
   const counts = GRADES.map(g => { const n = ms.filter(m => m.grade === g).length; return n ? `<span class="pc" style="--pc:${GCOL[g]}">${GLABEL[g]||g} <b class="num">${n}</b></span>` : ''; }).join('');
   const who = boss ? '' : exec ? `<div class="banner">${ic('info')}En tant qu'Exécutant, tu peux passer un membre Lieutenant ou Membre, et virer les Lieutenants et Membres.</div>`
     : `<div class="banner">${ic('lock')}Seuls les Exécutants et plus peuvent modifier les membres.</div>`;
-  return `${who}${boss ? `<div class="toolbar" style="margin-bottom:14px"><input class="inp" id="madd-name" placeholder="Nom du nouveau membre" maxlength="30" style="flex:1;min-width:140px;max-width:280px">
+  return `${who}${boss ? `<div class="toolbar" style="margin-bottom:14px"><button class="btn pri" data-a="rpopen">${ic('user')}Panel fiche RP</button><span class="lbl">${identMissing().length ? `${identMissing().length} fiche${identMissing().length > 1 ? 's' : ''} manquante${identMissing().length > 1 ? 's' : ''}` : 'Toutes les fiches sont complètes'}</span></div>` : ''}${boss ? `<div class="toolbar" style="margin-bottom:14px"><input class="inp" id="madd-name" placeholder="Nom du nouveau membre" maxlength="30" style="flex:1;min-width:140px;max-width:280px">
       <select class="inp" id="madd-grade" aria-label="Grade">${GRADES.map(g => `<option value="${g}" ${g==='Membre'?'selected':''}>${GLABEL[g]||g}</option>`).join('')}</select>
       <button class="btn pri" data-a="madd">${ic('plus')}Ajouter au crew</button></div>` : ''}
     ${ms.length ? `<div class="chips" style="margin-bottom:12px">${counts}</div>
@@ -1778,7 +1788,7 @@ function checkKick(c){
 function logout(state){
   clearTimeout(wizSaveT); Store.stopAll();
   Store.key = null; S.meId = null; S.myKey = null; S.mdocs = []; S.vault = {}; S.vaultOn = false;
-  Object.assign(S, {identOpen:false, identSkip:false, askWritten:false, idDraft:{}, freshLogin:false});
+  Object.assign(S, {identOpen:false, identSkip:false, askWritten:false, idDraft:{}, freshLogin:false, rpOpen:false});
   LS.set('crew-key', null);
   openLogin(state);
 }
@@ -2529,7 +2539,9 @@ document.addEventListener('drop', e => { const z = e.target.closest && e.target.
 const ID_RAPPEL = 24 * 3600e3, ID_AVERT = 72 * 3600e3;
 const identOf = id => S.ident.find(x => x.id === id) || null;
 const identDone = d => !!(d && d.first && d.last && d.phone && d.img);
-const autoSxId = (mid, type) => `autoid-${mid}-${type}`;
+// Une réinitialisation par un admin relance le délai (nouveau « cycle ») : les sanctions automatiques peuvent être redonnées.
+const idCycle = mid => (identOf(mid) || {}).cycle || 0;
+const autoSxId = (mid, type) => `autoid-${mid}-${type}` + (idCycle(mid) ? '-c' + idCycle(mid) : '');
 const autoSx = (mid, type) => S.sanctions.find(s => s.id === autoSxId(mid, type)) || null;
 const identMissing = () => members().filter(m => !identDone(identOf(m.id)));
 function identStatus(m){
@@ -2611,7 +2623,7 @@ async function identEnforce(){
     const self = m.id === my.id; const d = identOf(m.id);
     if (identDone(d)) { // fiche complète : on retire les sanctions automatiques
       if (!(self || isExec())) continue;
-      for (const type of ['rappel', 'avert']) { const s = autoSx(m.id, type); if (!s || s.cancelled) continue;
+      for (const s of S.sanctions.filter(x => x.auto === 'id' && x.memberId === m.id && !x.cancelled)) {
         s.cancelled = true; s.cancelledBy = 'Tablette (carte ajoutée)';
         await Store.write('sanctions/' + s.id, Object.assign({}, s, {cancelled:true, cancelledBy:'Tablette (carte ajoutée)', cancelledAt:now})); }
       continue;
@@ -2643,19 +2655,59 @@ function identBanners(){
     const miss = identMissing().filter(x => x.id !== m.id);
     const today = new Date().toDateString();
     if (miss.length && LS.get('id-banner-hide', '') !== today) out += `<div class="banner" style="flex-wrap:wrap">${ic('alert')}<span style="flex:1;min-width:180px"><b>${miss.length} membre${miss.length > 1 ? 's' : ''}</b> sans fiche RP complète : ${esc(miss.map(x => x.name).join(', '))}. Préviens-les !</span>
-      <button class="btn sm" data-a="idcopy">${ic('copy')}Copier le rappel</button><a class="btn sm" href="#membres">Voir</a><button class="btn ghost sm" data-a="idhide">Masquer aujourd'hui</button></div>`;
+      <button class="btn sm" data-a="idcopy">${ic('copy')}Copier le rappel</button><button class="btn sm" data-a="rpopen">Panel fiche RP</button><button class="btn ghost sm" data-a="idhide">Masquer aujourd'hui</button></div>`;
   }
   return out;
 }
-function identRow(m){
-  const d = identOf(m.id) || {}; const img = d.img || ''; if (img) loadImg(img);
+// Panel fiche RP (Patron, Co-Patron, admins) : toutes les fiches en cartes, filtres, recherche ; réinitialisation par les admins.
+function rpCard(m){
+  const d = identOf(m.id) || {}; const st = identStatus(m); const img = d.img || ''; if (img) loadImg(img);
   const src = img && imgCache[img] && imgCache[img] !== 'none' ? imgCache[img] : '';
-  return `<tr class="idrow"><td colspan="8"><div class="person">
-    <div class="pimg">${src ? `<button class="imgthumb" data-a="imgview" data-id="${esc(img)}" aria-label="Agrandir la carte d'identité de ${esc(m.name)}"><img src="${src}" alt="Carte d'identité de ${esc(m.name)}"></button>` : `<div class="imgph">${img ? 'Chargement…' : "Pas de carte d'identité"}</div>`}</div>
-    <div class="pinfo"><p><b>${esc([d.first, d.last].filter(Boolean).join(' ') || 'Nom RP non renseigné')}</b></p>
-      <p>${ic('phone')} ${esc(d.phone || 'Numéro non renseigné')}</p>
-      <small>${d.at ? 'Mis à jour ' + ago(d.at) : 'Jamais rempli'}</small></div></div></td></tr>`;
+  const k = 'rpreset:' + m.id;
+  const hasData = !!(d.first || d.last || d.phone || d.img);
+  return `<article class="rpcard">
+    <div class="rpimg">${src ? `<button class="imgthumb" data-a="imgview" data-id="${esc(img)}" aria-label="Agrandir la carte d'identité de ${esc(m.name)}"><img src="${src}" alt="Carte d'identité de ${esc(m.name)}"></button>`
+      : `<div class="imgph">${img ? 'Chargement…' : `${ic('user')}<span>Pas de carte d'identité</span>`}</div>`}</div>
+    <div class="rpinfo">
+      <div class="row" style="gap:8px"><b class="rpname">${esc([d.first, d.last].filter(Boolean).join(' ') || 'Nom RP non renseigné')}</b><span class="spacer"></span><span class="st-pill ${st.cls}">${esc(st.cls === 'ok' ? 'Complète' : st.cls === 'wait' ? 'Pas connecté' : 'Manquante')}</span></div>
+      <span class="rpline">${ic('phone')}${esc(d.phone || 'Numéro non renseigné')}</span>
+      <span class="rpline"><span class="grade" style="--gc:${GCOL[m.grade]}">${esc(GLABEL[m.grade] || m.grade)}</span><span>${esc(m.name)}</span></span>
+      <small>${st.cls === 'ok' ? (d.at ? 'Mise à jour ' + ago(d.at) : '') : esc(st.t)}${d.resetAt ? ` · réinitialisée ${ago(d.resetAt)}${d.resetBy ? ' par ' + esc(d.resetBy) : ''}` : ''}</small>
+      ${isAdmin() && hasData ? `<div class="row" style="gap:6px;margin-top:4px">${S.confirm === k
+        ? `<button class="btn red sm" data-a="rpreset" data-id="${esc(m.id)}">Confirmer la réinitialisation</button><button class="btn sm" data-a="noconfirm">Annuler</button>`
+        : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}">${ic('trash')}Réinitialiser la fiche</button>`}</div>` : ''}
+    </div></article>`;
 }
+function rpGridHtml(){
+  const q = normName(S.rpQ || '');
+  const all = GRADES.flatMap(g => members().filter(m => m.grade === g));
+  const list = all.filter(m => { const ok = identDone(identOf(m.id));
+    if (S.rpFilter === 'miss' && ok) return false; if (S.rpFilter === 'ok' && !ok) return false;
+    if (!q) return true; const d = identOf(m.id) || {};
+    return normName([m.name, d.first, d.last, d.phone].filter(Boolean).join(' ')).includes(q); });
+  return list.length ? list.map(rpCard).join('') : `<div class="empty" style="grid-column:1/-1"><strong>Aucune fiche</strong>Change le filtre ou la recherche.</div>`;
+}
+function renderRpPanel(full){
+  let root = $('#rppanel'); if (!root) { root = document.createElement('div'); root.id = 'rppanel'; document.body.appendChild(root); }
+  if (!S.rpOpen || !isBoss() || S.loginOpen) { root.innerHTML = ''; return; }
+  const grid = root.querySelector('#rp-grid');
+  if (grid && !full) { grid.innerHTML = rpGridHtml(); return; } // garde le focus de la recherche
+  const all = members(); const ok = all.filter(m => identDone(identOf(m.id))).length;
+  root.innerHTML = `<div class="ov" role="dialog" aria-modal="true" aria-label="Panel fiche RP"><div class="idm rpp">
+    <div class="row">${ic('user')}<h3>Panel fiche RP</h3><span class="spacer"></span><button class="btn sm" data-a="rpclose">${ic('x')}Fermer</button></div>
+    <div class="kpis" style="margin:0">
+      <div class="kpi"><small>Fiches complètes</small><b>${ok} / ${all.length}</b><span>membres du crew</span></div>
+      <div class="kpi"><small>Manquantes</small><b style="color:${all.length - ok ? 'var(--danger)' : 'inherit'}">${all.length - ok}</b><span>${all.length - ok ? 'à prévenir' : 'tout le monde est en règle'}</span></div>
+    </div>
+    <div class="toolbar"><div class="seg" role="group" aria-label="Filtre">
+        <button data-a="rpfilter" data-f="all" aria-pressed="${S.rpFilter === 'all'}">Toutes</button><button data-a="rpfilter" data-f="miss" aria-pressed="${S.rpFilter === 'miss'}">Manquantes</button><button data-a="rpfilter" data-f="ok" aria-pressed="${S.rpFilter === 'ok'}">Complètes</button></div>
+      <input class="inp" id="rp-q" data-c="rpq" placeholder="Rechercher (nom, nom RP, téléphone)" value="${esc(S.rpQ || '')}" style="flex:1;min-width:160px;max-width:320px">
+      <span class="spacer"></span>${all.length - ok ? `<button class="btn sm" data-a="idcopy">${ic('copy')}Copier le rappel</button>` : ''}</div>
+    ${isAdmin() ? '' : `<p class="hint" style="margin:0">Seuls les admins du site peuvent réinitialiser une fiche.</p>`}
+    <div class="rpgrid" id="rp-grid">${rpGridHtml()}</div>
+  </div></div>`;
+}
+
 
 /* ---------- Actions ---------- */
 const A = {
@@ -2671,7 +2723,15 @@ const A = {
       S.identSig = ''; renderIdent(); render(); }); },
   idcopy(){ copy(identCopyText(), null, 'Rappel copié. Colle-le sur Discord.'); },
   idhide(){ LS.set('id-banner-hide', new Date().toDateString()); render(); },
-  idview(t){ S.identView = S.identView === t.dataset.id ? null : t.dataset.id; render(); },
+  rpopen(){ if (!isBoss()) return; S.rpOpen = true; S.confirm = null; renderRpPanel(true); },
+  rpclose(){ S.rpOpen = false; S.confirm = null; renderRpPanel(true); render(); },
+  rpfilter(t){ S.rpFilter = t.dataset.f; renderRpPanel(true); },
+  rpreset(t){ S.confirm = null; const m = S.mdocs.find(x => x.id === t.dataset.id); if (!isAdmin() || !m) { render(); return; }
+    const d = identOf(m.id) || {}; const now = Date.now();
+    if (d.img) Store.write('intelimg/' + d.img, null); // l'ancienne photo est retirée
+    writeIdent(m.id, {first:'', last:'', phone:'', img:'', askedAt:now, cycle:(d.cycle || 0) + 1, resetAt:now, resetBy:me().name})
+      .then(ok => { if (ok) toast(`Fiche RP de ${m.name} réinitialisée : elle lui sera redemandée (nouveau délai de 24 h).`); render(); });
+    render(); },
   kickall(){ S.confirm = null; if (!isAdmin() || Store.mode !== 'fire') { render(); return; } const at = Date.now(); LS.set('crew-kick-ok', at);
     saveConfig({kickAt:at, kickKeep:[S.meId]}); toast('Tout le monde est déconnecté sauf toi. Chacun devra remettre son mot de passe.'); },
   logout(){ logout(); },
@@ -2878,7 +2938,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.id === 'lguest-in') { e.preventDefault(); A.lguest(); }
   if (e.key === 'Enter' && e.target.id === 'org-new') { e.preventDefault(); A.orgnew(); }
   if (e.key === 'Enter' && e.target.id === 'oe-g') { e.preventDefault(); A.opguest(); }
-  if (e.key === 'Escape') A.lbclose();
+  if (e.key === 'Escape') { const lb = $('#lightbox'); if (lb && !lb.hidden) A.lbclose(); else if (S.rpOpen) A.rpclose(); }
 });
 document.addEventListener('toggle', e => { const d = e.target; if (d && d.dataset && d.dataset.edit) S.labEdit = d.open ? d.dataset.edit : (S.labEdit === d.dataset.edit ? null : S.labEdit); }, true);
 document.addEventListener('input', e => {
@@ -2886,6 +2946,7 @@ document.addEventListener('input', e => {
   if (t.dataset.c === 'invq') { S.invQ = t.value; const g = $('#inv-grid'); if (g) g.innerHTML = gridHtml(); return; }
   if (t.dataset.c === 'sxreason') { S.sxReason = t.value; return; }
   if (t.dataset.c === 'idf') { S.idDraft[t.dataset.f] = t.value; return; }
+  if (t.dataset.c === 'rpq') { S.rpQ = t.value; const g = $('#rp-grid'); if (g) g.innerHTML = rpGridHtml(); return; }
   if (t.dataset.c === 'oe' && S.oe && ['total', 'targetOrg'].includes(t.dataset.f)) { S.oe[t.dataset.f] = t.value; return; }
   if (t.dataset.c === 'logq') { S.logQ = t.value; render(); const i = $('#log-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } return; }
   if (t.dataset.c === 'tgt' && S.wiz) { S.wiz.targetOrg = t.value; saveWiz(); const d = $('#disc'); if (d) d.textContent = discordText(opFromWiz(S.wiz)); return; }
