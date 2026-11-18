@@ -102,13 +102,13 @@ Un **formateur désigné** (même Membre) peut accepter, refuser et valider les 
 ## 5. Les pages
 
 ### Missions
-- **15 missions** : 3 opérations du crew (**Attaque de territoire**, **Attaque de laboratoire**, **PO sur Orga** : pas de niveau ni de temps de recharge ; pas d'argent pour les attaques, argent **facultatif** pour la PO sur Orga) et 12 missions de la tablette, de **Gruppe6** (niveau 1, 2-7 joueurs, +2 500 XP, recharge 24 h) à **Petit bunker** (niveau 45, 7-23 joueurs, +27 500 XP, recharge 168 h). Les autres sont Bateau de trafiquant, Flecca, Pine, Bijouterie, Roxwood, Paleto, Braquage de train, Yacht, Pacific Standard, Humane Labs et Plateforme pétrolière.
+- **19 missions** : 3 opérations du crew (**Attaque de territoire**, **Attaque de laboratoire**, **PO sur Orga** : pas de niveau ni de temps de recharge ; pas d'argent pour les attaques, argent **facultatif** pour la PO sur Orga), la carte **Récolte points chauds** (`lab:'hotspot'`, ouvre l'assistant de récolte du labo, accessible à tous les membres) et 15 missions de la tablette, dont **Braquage de supérette**, **Mission ATM** et **Mission conteneur** (valeurs de départ à ajuster), de **Gruppe6** (niveau 1, 2-7 joueurs, +2 500 XP, recharge 24 h) à **Petit bunker** (niveau 45, 7-23 joueurs, +27 500 XP, recharge 168 h). Les autres sont Bateau de trafiquant, Flecca, Pine, Bijouterie, Roxwood, Paleto, Braquage de train, Yacht, Pacific Standard, Humane Labs et Plateforme pétrolière.
 - Les missions au-dessus du **niveau du crew** (réglable, 22 par défaut) sont verrouillées. Une mission faite récemment affiche « En recharge · encore X h ».
 - **« Commencer »** (Exécutant et plus) ouvre un assistant en 4 étapes :
   1. **Équipe** : on coche les membres présents (regroupés par grade, avec leurs badges de formation) et on peut ajouter des renforts extérieurs. Le site prévient si le nombre est hors de la fourchette de la mission.
   2. **Postes** : Négociateur, Surveillance otages, Braquage ou Polyvalent. Le bouton **Auto** répartit au hasard selon des proportions (≥ 2 joueurs : 1 négociateur, 2 à partir de 10 ; ≥ 3 : 25 % surveillance ; ≥ 6 : 15 % polyvalent ; le reste au braquage). Une option donne la priorité aux membres formés.
   3. **Véhicules** : on choisit le nombre de véhicules, et 4 ou 5 places pour chacun. Un schéma de voiture vue de dessus montre les sièges (Conducteur, Passager, Arrière G, M, D). On place les gens en touchant un nom puis une place, ou par glisser-déposer. **Auto** place tout le monde au hasard (formés « Conducteur » au volant en priorité) et ajoute des véhicules s'il manque des places.
-  4. **Bilan** : Réussie ou Échouée et total gagné (obligatoire pour les braquages, facultatif pour la PO sur Orga, absent pour les attaques ; `payMode(mission)` = req / opt / none), part par personne, organisation visée (pour une PO), puis le **message Discord** avec un bouton Copier.
+  4. **Bilan** : Réussie ou Échouée et total gagné (facultatif pour les braquages et la PO sur Orga : laissé vide, il n'apparaît pas dans le message ; absent pour les attaques ; `payMode(mission)` = opt / none), part par personne, organisation visée (pour une PO), puis le **message Discord** avec un bouton Copier.
 - Pendant l'OP, elle apparaît **« OP en cours »** chez tout le monde, avec le poste et la place de chacun. Elle est sauvegardée en continu, un Exécutant peut la reprendre, et on peut l'annuler.
 - Format du message Discord :
 ```
@@ -148,12 +148,15 @@ Postes :
 - **Récoltes et ventes**, en assistants comme les missions :
   - **Récolte** (2 étapes) : présents, puis produit (Fentanyl) et nombre de pochons créés. Message :
     `# 🧪 Récolte de fentanyl / Détail : … / Pochons créés = 44`. Les pochons vont dans le **stock à vendre**.
+  - **Récolte points chauds** (2 étapes, `source: 'hotspot'`, `unit: 'unités'`, `perPerson{nom: qté}`) : présents, puis produit (ex. Soulvyne) et unités ramassées par chacun ; le **total récolté** est affiché en grand. Message :
+    `# 🌿 Récolte de soulvyne (points chauds) / Détail : … / Par personne : … / Total récolté = 1 250 unités`.
   - **Vente** (3 étapes) :
-    1. on choisit dans le stock les récoltes vendues, ce qui identifie leurs **créateurs** ;
+    1. on choisit **un produit** (tuiles avec le stock de chacun) puis la **quantité à vendre** (vente en gros : prise dans les récoltes les plus anciennes, raccourcis +10 / +100 / +1 000 / Tout), ou les récoltes à la main ; cela identifie les **créateurs**. Le nom de la vente est toujours celui de ses récoltes (`labProd`) ;
     2. on coche les vendeurs ;
     3. les pochons sont répartis automatiquement entre vendeurs (modifiable) et **chaque vendeur saisit son argent**.
     Message : `# 💵 Vente de fentanyl / Détail : Brandon / Créés par : Le R / Pochons vendus = 44 / (une ligne par vendeur s'ils sont plusieurs) / Total gagné = 120.000 $`.
-  - Compteurs (stock, créés, vendus, argent), classements Création et Ventes.
+  - Compteurs (stock par produit, créés, vendus, argent), « Stock à vendre » par produit avec bouton Vendre, classements Création et Ventes.
+  - **Noms des produits** (admins) : renommer un produit partout (récoltes + ventes) et corriger les ventes enregistrées sous un autre nom que leur récolte.
   - Les Exécutants peuvent **corriger** (l'assistant se rouvre prérempli) ou supprimer. Une récolte déjà en partie vendue ne peut pas être supprimée.
 - **Coffre du labo** : le même inventaire, séparé (champ `place: 'lab:<id>'`, ex. coffre « Roxwood » de 1 500 kg avec acide, catalyseur, base opioïde, solvant, pochons, méthylamine…).
 
@@ -213,7 +216,7 @@ Paies.
 | `coffre/<AAAA-Wss>` | tirage de la roue (`memberId, member, items[{label, qty, done}]`) |
 | `inv/<id>` | objets des coffres (`name, cat, qty, w, min, icon, place, at, by, byId`) |
 | `invlog/<id>` | journal des mouvements (`delta, item, place, by`) |
-| `labs/<id>` | `kind: 'recolte'` (`people, pochons, product`) ou `'vente'` (`sources[{id, qty, people}], creators, sellers[{name, pochons, money}], pochons, total`) ; champs `recipe` et `lastById` obligatoires |
+| `labs/<id>` | `kind: 'recolte'` (`people, pochons, product, unit`, + `source: 'hotspot', perPerson` aux points chauds) ou `'vente'` (`sources[{id, qty, people}], creators, sellers[{name, pochons, money}], pochons, total`) ; champs `recipe` et `lastById` obligatoires |
 | `formations/<memberId>__<formation>` | `status (inscrit, accepte, forme, none), wantId, trainerId, trainer, session, refusals[], validatedBy, history[]` |
 | `sanctions/<id>` | `memberId, member, type (rappel, avert), reason, by, byId, cancelled` |
 | `intel/<id>` | fiches de renseignement (`name, color, colorHex, claims, radio, threat, villa{desc, imgId}, boss{name, notes, imgId}, people[], notes[], log[], lastById`) |

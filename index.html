@@ -414,6 +414,17 @@ details.edit summary{cursor:pointer;font-size:12.5px;color:var(--accent-hi)}
 .srcrow .meta{font-size:12.5px;color:var(--muted)}
 .sellrow{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;padding:12px 14px;border-radius:5px;background:var(--card);border:1px solid var(--line);border-left:3px solid var(--ok)}
 .sellrow > b{min-width:90px;align-self:center;font-size:14px}
+.kpi.total{border-color:rgba(63,185,80,.45);background:linear-gradient(180deg,rgba(63,185,80,.12),var(--card))}
+.kpi.total b{font-size:34px;color:var(--ok)}
+.ptiles{display:flex;flex-wrap:wrap;gap:8px}
+.ptiles .mchip{flex-direction:column;align-items:flex-start;gap:2px;min-width:140px}
+.ptiles .mchip small{font-size:11.5px;color:var(--muted)}
+.qbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px}
+.prn{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
+.prn:first-of-type{border-top:0}
+.prn > span{flex:1;min-width:120px}
+.prn small{display:block;color:var(--muted);font-size:11.5px}
+.prn .inp{width:140px}
 .opc.rec .bar{background:var(--p-neg)}
 
 .fline{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:5px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--pc)}
@@ -544,7 +555,11 @@ const ART = {
   bunker:'<path d="M6 52c0-16 12-28 26-28s26 12 26 28zM22 52V40a10 10 0 0 1 20 0v12M2 52h60M32 24v-8M26 16h12"/>',
   flag:'<path d="M14 58V8M14 10h30l-6 9 6 9H14"/><path d="M6 58h20M40 40l14 14M54 40 40 54"/>',
   labo:'<path d="M20 6h12M23 6v14L10 46a4 4 0 0 0 4 6h24a4 4 0 0 0 4-6L29 20V6M15 38h22"/><path d="M42 14l14 14M56 14 42 28"/>',
-  po:'<circle cx="32" cy="32" r="20"/><circle cx="32" cy="32" r="8"/><path d="M32 4v14M32 46v14M4 32h14M46 32h14"/>'
+  po:'<circle cx="32" cy="32" r="20"/><circle cx="32" cy="32" r="8"/><path d="M32 4v14M32 46v14M4 32h14M46 32h14"/>',
+  shop:'<path d="M8 26h48v30H8zM4 26l6-16h44l6 16M4 26c0 5 4 8 8.5 8S21 31 21 26c0 5 4 8 7.5 8s7.5-3 7.5-8c0 5 3 8 7.5 8S52 31 52 26c0 5 4 8 8 8"/><path d="M24 56V42h16v14"/>',
+  container:'<path d="M4 18h56v34H4zM4 24h56M4 46h56M14 24v22M24 24v22M34 24v22M44 24v22M54 24v22"/><path d="M20 18l4-8h16l4 8"/>',
+  atm:'<rect x="12" y="6" width="40" height="52" rx="3"/><rect x="18" y="12" width="28" height="16" rx="1"/><path d="M20 36h4M30 36h4M40 36h4M20 42h4M30 42h4M40 42h4M22 50h20"/>',
+  leaf:'<path d="M32 58V30M32 30c0-14 8-22 22-24 0 16-8 24-22 24zM32 40c0-10-6-16-18-18 0 12 6 18 18 18z"/><path d="M14 58h36"/>'
 };
 const art = k => `<svg class="art-ic" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ART[k]}</svg>`;
 
@@ -553,8 +568,14 @@ const MISSIONS = [
   {id:'territoire', name:'Attaque de territoire', min:4, max:23, dur:30, lvl:0, hue:0,   art:'flag', crew:true, emoji:'🏴'},
   {id:'labo-atk',   name:'Attaque de laboratoire', min:4, max:15, dur:30, lvl:0, hue:270, art:'labo', crew:true, emoji:'🧪'},
   {id:'po-orga',    name:'PO sur Orga', min:2, max:15, dur:30, lvl:0, hue:350, art:'po', crew:true, emoji:'🎯', intel:true, money:true},
+  // Récolte aux points chauds : ouvre l'assistant du labo (chacun note ce qu'il a récolté), le total part dans le stock à vendre.
+  {id:'hotspot',    name:'Récolte points chauds', min:1, max:23, dur:30, lvl:0, hue:105, art:'leaf', crew:true, emoji:'🌿', lab:'hotspot'},
+  // Supérette, ATM et Conteneur : valeurs de départ à ajuster selon la tablette du serveur.
+  {id:'superette',name:'Braquage de supérette', min:1, max:4,  xp:800,   dur:15, lvl:1,  cd:12,  hue:55,  art:'shop'},
+  {id:'atm',      name:'Mission ATM',           min:1, max:4,  xp:1200,  dur:20, lvl:1,  cd:24,  hue:180, art:'atm'},
   {id:'gruppe6',  name:'Gruppe6',               min:2, max:7,  xp:2500,  dur:30, lvl:1,  cd:24,  hue:140, art:'truck'},
   {id:'bateau',   name:'Bateau de trafiquant',  min:4, max:7,  xp:1500,  dur:30, lvl:3,  cd:48,  hue:205, art:'ship'},
+  {id:'conteneur',name:'Mission conteneur',     min:3, max:8,  xp:4000,  dur:30, lvl:4,  cd:48,  hue:230, art:'container'},
   {id:'flecca',   name:'Flecca Banque',         min:4, max:10, xp:3500,  dur:30, lvl:5,  cd:48,  hue:150, art:'bank'},
   {id:'pine',     name:'Pine Banque',           min:4, max:15, xp:5000,  dur:30, lvl:7,  cd:48,  hue:28,  art:'bank'},
   {id:'bijouterie',name:'Braquage de bijouterie',min:4,max:15, xp:6000,  dur:30, lvl:12, cd:72,  hue:285, art:'gem'},
@@ -568,8 +589,9 @@ const MISSIONS = [
   {id:'bunker',   name:'Petit bunker',          min:7, max:23, xp:27500, dur:45, lvl:45, cd:168, hue:90,  art:'bunker'}
 ];
 const MBY = Object.fromEntries(MISSIONS.map(m => [m.id, m]));
-// Argent d'une mission : 'req' obligatoire (braquages), 'opt' facultatif (PO sur Orga), 'none' aucun (attaques).
-const payMode = mi => !mi || !mi.crew ? 'req' : mi.money ? 'opt' : 'none';
+// Argent d'une mission : 'opt' facultatif (braquages de la tablette, PO sur Orga : laisser vide si rien n'a été gagné),
+// 'none' aucun (attaques du crew). Le total n'apparaît dans le message Discord que s'il est rempli.
+const payMode = mi => !mi || !mi.crew ? 'opt' : mi.money ? 'opt' : 'none';
 
 const GRADES = ['Patron','Co-Patron','Exécutant','Lieutenant','Membre'];
 const GCOL = {'Patron':'var(--g-patron)','Co-Patron':'var(--g-copatron)','Exécutant':'var(--g-exec)','Lieutenant':'var(--g-lieut)','Membre':'var(--g-membre)'};
@@ -613,7 +635,7 @@ const NAV = [
   {id:'missions', label:'Missions', icon:'swords', title:'Missions', sub:'Lancez des braquages et opérations pour faire progresser votre crew.'},
   {id:'bilans', label:"Bilan d'activité", icon:'scroll', title:"Bilan d'activité", sub:'Historique des OP, gains et participation de chaque membre.'},
   {id:'coffre', label:'Coffre', icon:'box', title:'Coffre', sub:'Ce qu\'il y a dans le coffre de la villa, et qui le remplit cette semaine.'},
-  {id:'labos', label:'Laboratoires', icon:'flask', title:'Laboratoires', sub:'Récoltes de pochons, ventes et coffre du labo.'},
+  {id:'labos', label:'Laboratoires', icon:'flask', title:'Laboratoires', sub:'Récoltes (labo et points chauds), ventes en gros et coffre du labo.'},
   {id:'renseignements', label:'Renseignements', icon:'eye', title:'Renseignements', sub:'Fiches des autres organisations : villa, radio, patron, membres connus.'},
   {id:'formations', label:'Formations', icon:'grad', title:'Formations', sub:'Demande ta formation, un formateur l\'accepte et te forme.'},
   {id:'membres', label:'Membres', icon:'users', title:'Membres', sub:'La hiérarchie du crew et le parcours de chaque membre.'},
@@ -751,7 +773,7 @@ const LOG_FR = {name:'nom', grade:'grade', removed:'viré', admin:'admin', pwCha
   coffreItems:'contenu du coffre', coffreExclude:'exclus de la roue', coffreExcludeLast:'exclure le dernier', trainers:'formateurs', labSites:'labos', recipes:'recettes',
   qty:'quantité', min:'minimum', cat:'catégorie', w:'poids', icon:'icône', place:'emplacement', status:'statut', session:'session', note:'note', reason:'raison',
   cancelled:'annulée', total:'total', participants:'participants', result:'résultat', missionName:'mission', targetOrg:'organisation visée', pochons:'pochons',
-  product:'produit', sellers:'vendeurs', sources:'récoltes', color:'couleur', radio:'radio', threat:'menace', boss:'patron', villa:'villa', people:'membres connus',
+  product:'produit', unit:'unité', perPerson:'par personne', source:'origine', sellers:'vendeurs', sources:'récoltes', color:'couleur', radio:'radio', threat:'menace', boss:'patron', villa:'villa', people:'membres connus',
   notes:'journal', claims:'revendique', items:'cases', member:'membre', memberId:'membre', trainer:'formateur', postes:'postes', vehicles:'véhicules'};
 const mNameOf = id => { const m = S.mdocs.find(x => x.id === id); return m ? m.name : (id || '?'); };
 function logVal(v){
@@ -825,7 +847,7 @@ function logItem(op){
       else t = `${x.name} modifié (${fields() || '—'}) · ${placeName(x.place)}`;
       break;
     case 'invlog': s = 'inv'; minor = true; t = `Historique du coffre : ${x.delta > 0 ? '+' : ''}${x.delta} ${x.item}`; break;
-    case 'labs': t = `${x.kind === 'vente' ? 'Vente' : 'Récolte'}${x.product ? ' « ' + x.product + ' »' : ''} ${verbF} · ${x.pochons || 0} pochons${x.kind === 'vente' && x.total ? ' · ' + money(x.total) + ' $' : ''}`; break;
+    case 'labs': t = `${x.kind === 'vente' ? 'Vente' : x.source === 'hotspot' ? 'Récolte points chauds' : 'Récolte'}${x.product ? ' « ' + x.product + ' »' : ''} ${verbF}${live && !del && changed('product') ? ' (renommée, avant : ' + live.product + ')' : ''} · ${x.pochons || 0} ${x.unit || 'pochons'}${x.kind === 'vente' && x.total ? ' · ' + money(x.total) + ' $' : ''}`; break;
     case 'intel': t = `Fiche ${x.name || id} ${verbF}${live && !del && fields() ? ' (' + fields() + ')' : ''}`; break;
     case 'intelimg': s = 'intel'; t = del ? 'Photo supprimée' : `Photo ajoutée${x.orgId ? ' (fiche ' + (((S.intel || []).find(o => o.id === x.orgId) || {}).name || x.orgId) + ')' : ''}`; return {s, t, p:path};
     case 'crew':
@@ -925,15 +947,16 @@ function missionCard(m){
   const locked = m.lvl > (Number(cfg().crewLevel)||1);
   const last = lastOpOf(m.id);
   const left = last ? (last.endedAt + m.cd*3600e3) - Date.now() : 0;
-  let sub = m.crew ? 'Opération du crew' : 'Disponible en permanence', subCls = '';
+  let sub = m.lab ? 'Récolte pour le labo' : m.crew ? 'Opération du crew' : 'Disponible en permanence', subCls = '';
   if (locked) sub = `Débloquée au niveau ${m.lvl}`;
   else if (left > 0) { const h = Math.ceil(left/3600e3); sub = `En recharge · encore ${h} h`; subCls = 'cool'; }
   let btn;
-  if (locked) btn = `<button class="btn lock-b" disabled>Niveau ${m.lvl} requis</button>`;
+  if (m.lab) btn = me() ? `<button class="btn pri" data-a="lnew" data-k="recolte" data-src="hotspot">Commencer</button>` : `<button class="btn lock-b" disabled>Connexion requise</button>`;
+  else if (locked) btn = `<button class="btn lock-b" disabled>Niveau ${m.lvl} requis</button>`;
   else if (!isLead()) btn = `<button class="btn lock-b" disabled title="Seuls les Exécutants et plus lancent une OP">Réservé aux Exécutants</button>`;
   else btn = `<button class="btn pri" data-a="start" data-m="${m.id}">Commencer</button>`;
   return `<article class="mcard ${locked?'locked':''}" style="--h:${m.hue}">
-    <div class="mart"><span class="ghost-t">${esc(m.name)}</span>${art(m.art)}${m.cd ? `<span class="cd">${ic('clock')}${m.cd}h</span>` : '<span class="cd">Crew</span>'}</div>
+    <div class="mart"><span class="ghost-t">${esc(m.name)}</span>${art(m.art)}${m.cd ? `<span class="cd">${ic('clock')}${m.cd}h</span>` : `<span class="cd">${m.lab ? 'Labo' : 'Crew'}</span>`}</div>
     <div class="mbody">
       <div class="mname"><h3 title="${esc(m.name)}">${esc(m.name)}</h3><p class="${subCls}">${sub}</p></div>
       <div class="mstats">
@@ -1137,7 +1160,7 @@ function stepBilan(w, m){
         ${m.intel ? `<label class="field" for="tgt">Organisation visée (facultatif)<input class="inp" id="tgt" data-c="tgt" list="tgt-list" maxlength="40" placeholder="Nom de l'orga prise en PO" value="${esc(w.targetOrg || '')}"><datalist id="tgt-list">${S.intel.map(o => `<option value="${esc(o.name)}">`).join('')}</datalist></label>
           <p class="hint" style="margin:0">À l'enregistrement, sa fiche est créée ou complétée dans <b>Renseignements</b> : ajoutes-y ensuite les infos récoltées.</p>` : ''}
         ${payMode(m) === 'none' ? `<p class="hint" style="margin:0">Pas d'argent à déclarer pour cette mission : enregistre directement le bilan.</p>` : ''}
-        ${w.result !== 'fail' && payMode(m) !== 'none' ? `<label class="field" for="total">Total gagné ($)${payMode(m) === 'opt' ? ' — facultatif, si vous avez récupéré de l\'argent' : ''}
+        ${w.result !== 'fail' && payMode(m) !== 'none' ? `<label class="field" for="total">Total gagné ($) — facultatif, laisse vide si la mission n'a rien rapporté
           <input class="inp money" id="total" data-c="total" inputmode="numeric" autocomplete="off" placeholder="1.733.650" value="${esc(w.total ? money(parseMoney(w.total)) : '')}"></label>
         <div class="kpi"><small>Part par personne</small><b id="share">${money(share)} $</b><span>Total divisé par ${n} participant${n>1?'s':''} — indicatif, en attendant les paies.</span></div>` : ''}
         <label class="check"><input type="checkbox" id="withp" data-c="withp" ${w.withPostes?'checked':''}>Ajouter les postes dans le message</label>
@@ -1149,9 +1172,9 @@ function stepBilan(w, m){
     </div>`;
 }
 function selectText(el){ try { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); } catch(e){} }
-function copy(text, el){
+function copy(text, el, msg){
   try {
-    navigator.clipboard.writeText(text).then(() => toast('Copié. Colle-le dans le salon bilan d\'activité.'), () => { if (el) selectText(el); toast('Texte sélectionné : fais Ctrl+C pour copier.'); });
+    navigator.clipboard.writeText(text).then(() => toast(msg || 'Copié. Colle-le dans le salon bilan d\'activité.'), () => { if (el) selectText(el); toast(msg ? msg.replace('Message copié.', 'Copie le message depuis son bilan.') : 'Texte sélectionné : fais Ctrl+C pour copier.'); });
   } catch(e) { if (el) selectText(el); toast('Texte sélectionné : fais Ctrl+C pour copier.'); }
 }
 function placeSel(target){
@@ -1202,7 +1225,7 @@ function opEditForm(){
     ${on ? `<select class="inp" data-c="oepp" data-n="${esc(n)}" aria-label="Poste de ${esc(n)}"><option value="">Sans poste</option>${POSTES.map(p => `<option value="${p.id}" ${e.parts[n] === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select>` : ''}</div>`; }).join('');
   return `<div class="oe stack" style="gap:12px">
     <div class="oe-g">
-      <label class="field">Mission<select class="inp" data-c="oe" data-f="missionId">${MISSIONS.map(m => `<option value="${m.id}" ${m.id === e.missionId ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>
+      <label class="field">Mission<select class="inp" data-c="oe" data-f="missionId">${MISSIONS.filter(m => !m.lab).map(m => `<option value="${m.id}" ${m.id === e.missionId ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}</select></label>
       <label class="field">Résultat<select class="inp" data-c="oe" data-f="result"><option value="ok" ${e.result !== 'fail' ? 'selected' : ''}>Réussie</option><option value="fail" ${e.result === 'fail' ? 'selected' : ''}>Échouée</option></select></label>
       <label class="field">Date et heure<input class="inp" type="datetime-local" data-c="oe" data-f="at" value="${esc(e.at)}"></label>
       ${pm !== 'none' && e.result !== 'fail' ? `<label class="field">Total gagné ($)${pm === 'opt' ? ' — facultatif' : ''}<input class="inp" id="oe-total" data-c="oe" data-f="total" inputmode="numeric" value="${esc(e.total)}" placeholder="0"></label>` : ''}
@@ -2017,48 +2040,109 @@ const LAB_SEED = [
 ];
 
 /* ---------- Laboratoires : récoltes et ventes ---------- */
-// Une récolte = des pochons créés par les présents. Une vente = des pochons pris dans le stock des récoltes,
-// répartis entre les vendeurs, avec l'argent gagné par chacun. Les créateurs sont notés dans le bilan de la vente.
+// Une récolte = des pochons créés au labo, ou des unités ramassées aux points chauds (source 'hotspot', quantité par personne).
+// Une vente = une quantité d'UN produit prise dans le stock de ses récoltes (les plus anciennes d'abord, ou choisies à la main),
+// répartie entre les vendeurs, avec l'argent gagné par chacun. Les créateurs sont notés dans le bilan de la vente.
 const PRODUCTS = ['Fentanyl'];
+const DEF_PROD = 'Fentanyl';
+const prodOf = x => String((x && x.product) || DEF_PROD).trim() || DEF_PROD;
+const unitOf = x => (x && x.unit) || 'pochons';
+const sameProd = (a, b) => slug(a || '') === slug(b || '');
+const cap1 = s => String(s).charAt(0).toUpperCase() + String(s).slice(1);
 const labRecs = kind => S.labs.filter(x => x.kind === kind);
 const soldFrom = id => labRecs('vente').reduce((s, v) => s + (v.sources || []).filter(x => x.id === id).reduce((a, x) => a + (x.qty || 0), 0), 0);
 const remainingOf = r => Math.max(0, (r.pochons || 0) - soldFrom(r.id));
-const stockList = () => labRecs('recolte').map(r => Object.assign({}, r, {left: remainingOf(r)})).filter(r => r.left > 0).sort((a, b) => a.at - b.at);
+const stockList = prod => labRecs('recolte').map(r => Object.assign({}, r, {left: remainingOf(r)}))
+  .filter(r => r.left > 0 && (!prod || sameProd(prodOf(r), prod))).sort((a, b) => a.at - b.at);
+const stockOf = prod => stockList(prod).reduce((s, r) => s + r.left, 0);
+// Stock par produit : [{product, qty, unit, n}], le plus gros stock d'abord.
+function stockByProduct(){
+  const o = {};
+  stockList().forEach(r => { const k = slug(prodOf(r)); const e = o[k] || (o[k] = {product:prodOf(r), qty:0, unit:unitOf(r), n:0}); e.qty += r.left; e.n++; });
+  return Object.values(o).sort((a, b) => b.qty - a.qty);
+}
+// Nom réel du produit d'une vente : celui de ses récoltes (corrige les anciennes ventes enregistrées « Fentanyl » par défaut).
+function labProd(x){
+  if (!x || x.kind !== 'vente') return prodOf(x);
+  const ps = [...new Map((x.sources || []).map(s => S.labs.find(r => r.id === s.id)).filter(Boolean).map(r => [slug(prodOf(r)), prodOf(r)])).values()];
+  return ps.length === 1 ? ps[0] : prodOf(x);
+}
+function labUnit(x){
+  if (!x || x.kind !== 'vente' || x.unit) return unitOf(x);
+  const r = (x.sources || []).map(s => S.labs.find(y => y.id === s.id)).filter(Boolean)[0];
+  return r ? unitOf(r) : 'pochons';
+}
+const unitForProduct = p => { const r = labRecs('recolte').filter(x => sameProd(prodOf(x), p)).sort((a, b) => b.at - a.at)[0]; return r ? unitOf(r) : 'pochons'; };
+const knownProducts = () => [...new Map(PRODUCTS.concat(S.labs.filter(x => x.kind).map(labProd)).map(p => [slug(p), p])).values()];
 const list2 = a => a.length ? a.join(', ') : '—';
 function recolteText(r){
-  return [`# 🧪 Récolte de ${String(r.product || 'Fentanyl').toLowerCase()}`, '', `Détail : ${list2(r.people || [])}`, `Pochons créés = ${fmtQty(r.pochons)}`].join('\n');
+  const hot = r.source === 'hotspot', u = unitOf(r), pp = r.perPerson || {}, people = r.people || [];
+  const L = [`# ${hot ? '🌿' : '🧪'} Récolte de ${prodOf(r).toLowerCase()}${hot ? ' (points chauds)' : ''}`, '', `Détail : ${list2(people)}`];
+  if (hot && people.length > 1) { L.push('', 'Par personne :'); people.forEach(n => L.push(`• ${n} : ${fmtQty(pp[n] || 0)}`)); L.push(''); }
+  L.push(hot ? `Total récolté = ${fmtQty(r.pochons)} ${u}` : `${cap1(u)} créés = ${fmtQty(r.pochons)}`);
+  return L.join('\n');
 }
 function venteText(v){
-  const sellers = v.sellers || [];
-  const L = [`# 💵 Vente de ${String(v.product || 'Fentanyl').toLowerCase()}`, '', `Détail : ${list2(sellers.map(s => s.name))}`,
-    `Créés par : ${list2(v.creators || [])}`, `Pochons vendus = ${fmtQty(v.pochons)}`];
-  if (sellers.length > 1) { L.push('', 'Vendeurs :'); sellers.forEach(s => L.push(`• ${s.name} : ${fmtQty(s.pochons)} pochons · ${money(s.money)} $`)); L.push(''); }
+  const sellers = v.sellers || [], u = labUnit(v);
+  const L = [`# 💵 Vente de ${labProd(v).toLowerCase()}`, '', `Détail : ${list2(sellers.map(s => s.name))}`,
+    `Créés par : ${list2(v.creators || [])}`, `${cap1(u)} vendus = ${fmtQty(v.pochons)}`];
+  if (sellers.length > 1) { L.push('', 'Vendeurs :'); sellers.forEach(s => L.push(`• ${s.name} : ${fmtQty(s.pochons)} ${u} · ${money(s.money)} $`)); L.push(''); }
   L.push(`Total gagné = ${money(v.total)} $`);
   return L.join('\n');
 }
 // ----- Assistant (même principe que les missions) -----
-function newLabWiz(kind){
-  return {kind, step:0, people:[], product:'Fentanyl', pochons:'', sources:{}, extra:'', shares:{}, money:{}, editId:null};
+function newLabWiz(kind, src){
+  const hot = kind === 'recolte' && src === 'hotspot';
+  const lastHot = hot ? labRecs('recolte').filter(r => r.source === 'hotspot').sort((a, b) => b.at - a.at)[0] : null;
+  const top = kind === 'vente' ? stockByProduct()[0] : null;
+  return {kind, src: hot ? 'hotspot' : '', step:0, people:[], product: hot ? (lastHot ? prodOf(lastHot) : '') : kind === 'vente' ? (top ? top.product : DEF_PROD) : DEF_PROD,
+    pochons:'', per:{}, sources:{}, qty: top ? String(top.qty) : '', pick:false, extra:'', shares:{}, money:{}, editId:null};
+}
+const lwHot = w => w.kind === 'recolte' && w.src === 'hotspot';
+// Quantité encore disponible pour cette vente (le stock + ce que la vente corrigée avait déjà pris).
+function lwBack(w, id){ const v = w.editId && S.labs.find(x => x.id === w.editId); return v ? ((v.sources || []).find(x => x.id === id) || {}).qty || 0 : 0; }
+function lwAvail(w){
+  const old = w.editId ? S.labs.find(x => x.id === w.editId) : null;
+  const back = old ? (old.sources || []).filter(s => { const r = S.labs.find(x => x.id === s.id); return r && sameProd(prodOf(r), w.product); }).reduce((s, x) => s + (x.qty || 0), 0) : 0;
+  return stockOf(w.product) + back;
 }
 function lwSources(w){ // [{id, qty, people}]
+  if (w.kind !== 'vente') return [];
+  if (!w.pick) { // vente en gros : la quantité demandée est prise dans les récoltes les plus anciennes du produit
+    let need = Math.max(0, parseInt(w.qty, 10) || 0); const out = [];
+    for (const r of stockList(w.product)) { if (need <= 0) break; const q = Math.min(need, r.left); out.push({id:r.id, qty:q, people:r.people || []}); need -= q; }
+    return out;
+  }
   const out = [];
   Object.entries(w.sources).forEach(([id, q]) => { const r = S.labs.find(x => x.id === id); const qty = parseInt(q, 10) || 0; if (r && qty > 0) out.push({id, qty, people: r.people || []}); });
   return out;
 }
-function lwPochons(w){ return w.kind === 'recolte' ? (parseInt(w.pochons, 10) || 0) : lwSources(w).reduce((s, x) => s + x.qty, 0) + (parseInt(w.extra, 10) || 0); }
+const lwPer = w => w.people.reduce((s, p) => s + (parseInt(w.per[p], 10) || 0), 0);
+function lwPochons(w){
+  if (w.kind === 'recolte') return lwHot(w) ? lwPer(w) : (parseInt(w.pochons, 10) || 0);
+  return lwSources(w).reduce((s, x) => s + x.qty, 0) + (parseInt(w.extra, 10) || 0);
+}
+const lwOver = w => w.kind === 'vente' && !w.pick && (parseInt(w.qty, 10) || 0) > lwAvail(w);
 function lwSplit(w){ // répartition égale des pochons entre vendeurs
   const n = w.people.length, tot = lwPochons(w); w.shares = {};
   w.people.forEach((p, i) => { w.shares[p] = Math.floor(tot / n) + (i < tot % n ? 1 : 0); });
 }
 function lwRecord(w){
-  const base = {kind:w.kind, recipe:slug(w.product || 'fentanyl'), product:(w.product || 'Fentanyl').trim() || 'Fentanyl'};
-  if (w.kind === 'recolte') return Object.assign(base, {people:w.people.slice(), pochons:lwPochons(w)});
+  const prod = String(w.product || '').trim().slice(0, 30) || (lwHot(w) ? 'Produit' : DEF_PROD);
+  const base = {kind:w.kind, recipe:slug(prod), product:prod};
+  if (w.kind === 'recolte') {
+    const r = Object.assign(base, {people:w.people.slice(), pochons:lwPochons(w), unit: lwHot(w) ? 'unités' : 'pochons'});
+    if (lwHot(w)) Object.assign(r, {source:'hotspot', perPerson:Object.fromEntries(w.people.map(p => [p, parseInt(w.per[p], 10) || 0]))});
+    return r;
+  }
   const sources = lwSources(w);
+  const r0 = sources.length ? S.labs.find(x => x.id === sources[0].id) : null;
   const creators = [...new Set(sources.flatMap(s => s.people))];
   const sellers = w.people.map(p => ({name:p, pochons:parseInt(w.shares[p], 10) || 0, money:parseMoney(w.money[p])}));
-  return Object.assign(base, {sources, extra:parseInt(w.extra, 10) || 0, creators, sellers, pochons:lwPochons(w), total:sellers.reduce((s, x) => s + x.money, 0)});
+  return Object.assign(base, {unit: r0 ? unitOf(r0) : unitForProduct(prod), sources, extra:parseInt(w.extra, 10) || 0, creators, sellers, pochons:lwPochons(w), total:sellers.reduce((s, x) => s + x.money, 0)});
 }
-const LW_STEPS = {recolte:['Présents', 'Pochons créés'], vente:['Pochons vendus', 'Vendeurs', 'Argent gagné']};
+const LW_STEPS = {recolte:['Présents', 'Pochons créés'], hotspot:['Présents', 'Quantités récoltées'], vente:['Produit et quantité', 'Vendeurs', 'Argent gagné']};
+const lwSteps = w => w.kind === 'vente' ? LW_STEPS.vente : lwHot(w) ? LW_STEPS.hotspot : LW_STEPS.recolte;
 function lwTeam(w, label){
   const ms = members();
   const groups = GRADES.map(g => { const l = ms.filter(x => x.grade === g); if (!l.length) return '';
@@ -2071,52 +2155,82 @@ function lwTeam(w, label){
       <div class="row"><input class="inp" id="lguest-in" placeholder="Nom d'un renfort" maxlength="30" style="flex:1;max-width:320px"><button class="btn sm" data-a="lguest">${ic('plus')}Ajouter</button></div>
       ${guests.length ? `<div class="chips" style="margin-top:10px">${guests.map(g => `<button class="mchip" aria-pressed="true" data-a="lptoggle" data-n="${esc(g)}"><span class="ck">${ic('check')}</span>${esc(g)}</button>`).join('')}</div>` : ''}</div>`;
 }
+const discBox = txt => `<div class="stack"><div class="row"><span class="field" style="flex:1">Message pour #bilan-activité</span><button class="btn sm" data-a="lcopywiz">${ic('copy')}Copier pour Discord</button></div><pre class="disc" id="ldisc">${esc(txt)}</pre></div>`;
+const prodList = () => `<datalist id="lw-prods">${knownProducts().map(p => `<option value="${esc(p)}">`).join('')}</datalist>`;
+function lwAllocHtml(w){ // aperçu des récoltes d'où sortent les unités vendues en gros
+  const src = lwSources(w); const u = unitForProduct(w.product);
+  if (lwOver(w)) return `<div class="banner" style="margin:0">${ic('alert')}Il n'y a que ${fmtQty(lwAvail(w))} ${esc(u)} de ${esc(w.product)} en stock.</div>`;
+  if (!src.length) return '';
+  return `<div class="hist">${src.map(s => { const r = S.labs.find(x => x.id === s.id) || {}; return `<div class="hist-r"><span><b>${fmtQty(s.qty)} ${esc(unitOf(r))}</b> de la récolte du ${fmtD(r.at)}<br><small>${r.source === 'hotspot' ? 'Récoltés' : 'Créés'} par ${esc(list2(r.people || []))}</small></span></div>`; }).join('')}</div>`;
+}
 function lwBody(w){
   if (w.kind === 'recolte') {
-    if (w.step === 0) return lwTeam(w, `présent${w.people.length > 1 ? 's' : ''} pour créer les pochons`);
+    if (w.step === 0) return lwTeam(w, lwHot(w) ? `présent${w.people.length > 1 ? 's' : ''} aux points chauds` : `présent${w.people.length > 1 ? 's' : ''} pour créer les pochons`);
+    const rec = lwRecord(w);
+    if (lwHot(w)) return `<div class="cols"><div class="stack">
+        <label class="field" for="lw-prod">Produit récolté<input class="inp" id="lw-prod" data-c="lprod" list="lw-prods" value="${esc(w.product)}" maxlength="30" placeholder="Ex. Soulvyne">${prodList()}</label>
+        <p class="hint" style="margin:0">Chacun indique combien d'unités il a ramassées aux points chauds.</p>
+        ${w.people.map(p => `<div class="sellrow" style="border-left-color:var(--p-poly)"><b>${esc(p)}</b>
+          <label class="field">Unités récoltées<input class="inp num" data-c="lper" data-n="${esc(p)}" type="number" min="0" inputmode="numeric" value="${esc(w.per[p] != null ? w.per[p] : '')}" placeholder="0" style="width:120px"></label></div>`).join('')}
+        <div class="kpi total"><small>Total récolté</small><b id="lw-hot">${fmtQty(rec.pochons)}</b><span id="lw-hot-s">unités${rec.product ? ' de ' + esc(rec.product) : ''} ajoutées au stock à vendre</span></div>
+      </div>${discBox(recolteText(rec))}</div>`;
     return `<div class="cols"><div class="stack">
-        <label class="field" for="lw-prod">Produit<input class="inp" id="lw-prod" data-c="lprod" list="lw-prods" value="${esc(w.product)}" maxlength="30"><datalist id="lw-prods">${PRODUCTS.map(p => `<option value="${p}">`).join('')}</datalist></label>
+        <label class="field" for="lw-prod">Produit<input class="inp" id="lw-prod" data-c="lprod" list="lw-prods" value="${esc(w.product)}" maxlength="30">${prodList()}</label>
         <label class="field" for="lw-poch">Nombre total de pochons créés<input class="inp money" id="lw-poch" data-c="lpoch" inputmode="numeric" placeholder="44" value="${esc(w.pochons)}"></label>
         <div class="kpi"><small>Créés par</small><b style="font-size:15px">${esc(list2(w.people))}</b><span>${w.people.length} personne${w.people.length > 1 ? 's' : ''}</span></div>
-      </div><div class="stack"><div class="row"><span class="field" style="flex:1">Message pour #bilan-activité</span><button class="btn sm" data-a="lcopywiz">${ic('copy')}Copier pour Discord</button></div><pre class="disc" id="ldisc">${esc(recolteText(lwRecord(w)))}</pre></div></div>`;
+      </div>${discBox(recolteText(rec))}</div>`;
   }
   if (w.step === 0) {
-    const st = stockList().concat(w.editId ? S.labs.filter(r => r.kind === 'recolte' && w.sources[r.id] && !stockList().some(x => x.id === r.id)).map(r => Object.assign({}, r, {left:0})) : []);
-    const editBack = id => { const v = w.editId && S.labs.find(x => x.id === w.editId); return v ? ((v.sources || []).find(x => x.id === id) || {}).qty || 0 : 0; };
-    return `<p class="hint" style="margin:0">Coche les récoltes d'où viennent les pochons vendus. Ceux qui les ont créés seront notés dans le bilan de la vente.</p>
-      ${st.length ? `<div class="stack" style="gap:8px">${st.map(r => { const max = r.left + editBack(r.id); const on = w.sources[r.id] != null;
-        return `<div class="srcrow ${on ? 'on' : ''}"><button class="mchip" data-a="lsrc" data-id="${esc(r.id)}" aria-pressed="${on}"><span class="ck">${on ? ic('check') : ''}</span>${fmtQty(max)} pochons</button>
-          <span class="meta">${esc(r.product || 'Fentanyl')} · créés par <b>${esc(list2(r.people || []))}</b> · ${fmtD(r.at)}</span><span class="spacer"></span>
+    const tiles = stockByProduct();
+    if (w.product && !tiles.some(p => sameProd(p.product, w.product))) tiles.push({product:w.product, qty:0, unit:unitForProduct(w.product), n:0});
+    const u = unitForProduct(w.product), avail = lwAvail(w);
+    const manual = () => { const st = stockList(w.product).concat(w.editId ? S.labs.filter(r => r.kind === 'recolte' && w.sources[r.id] != null && sameProd(prodOf(r), w.product) && !stockList(w.product).some(x => x.id === r.id)).map(r => Object.assign({}, r, {left:0})) : []);
+      return st.length ? `<div class="stack" style="gap:8px">${st.map(r => { const max = r.left + lwBack(w, r.id); const on = w.sources[r.id] != null;
+        return `<div class="srcrow ${on ? 'on' : ''}"><button class="mchip" data-a="lsrc" data-id="${esc(r.id)}" aria-pressed="${on}"><span class="ck">${on ? ic('check') : ''}</span>${fmtQty(max)} ${esc(unitOf(r))}</button>
+          <span class="meta">${r.source === 'hotspot' ? 'récoltés' : 'créés'} par <b>${esc(list2(r.people || []))}</b> · ${fmtD(r.at)}</span><span class="spacer"></span>
           ${on ? `<label class="field" style="flex-direction:row;align-items:center;gap:8px">Vendus<input class="inp num" data-c="lsrcq" data-id="${esc(r.id)}" type="number" min="1" max="${max}" value="${esc(w.sources[r.id])}" style="width:90px"></label>` : ''}</div>`; }).join('')}</div>`
-        : `<div class="empty"><strong>Aucun pochon en stock</strong>Enregistre d'abord une récolte, ou indique des pochons hors stock ci-dessous.</div>`}
-      <label class="field" for="lw-extra" style="max-width:320px">Autres pochons (pas dans le stock)<input class="inp num" id="lw-extra" data-c="lextra" type="number" min="0" value="${esc(w.extra)}" placeholder="0"></label>
-      <div class="toolbar"><span class="lbl">Total vendu : <b class="num" id="lw-tot">${fmtQty(lwPochons(w))}</b> pochons</span></div>`;
+        : `<div class="empty"><strong>Aucune récolte de ${esc(w.product)} en stock</strong>Indique les unités hors stock ci-dessous si besoin.</div>`; };
+    return `<div class="field">Produit à vendre</div>
+      ${tiles.length ? `<div class="ptiles">${tiles.map(p => { const on = sameProd(p.product, w.product);
+        return `<button class="mchip" data-a="lprodsel" data-p="${esc(p.product)}" aria-pressed="${on}"><b>${esc(p.product)}</b><small>${fmtQty(p.qty)} ${esc(p.unit)} en stock</small></button>`; }).join('')}</div>`
+        : `<div class="empty"><strong>Rien en stock</strong>Enregistre d'abord une récolte (labo ou points chauds), ou indique des unités hors stock ci-dessous.</div>`}
+      ${w.pick ? `<div class="toolbar"><span class="lbl">Récoltes de ${esc(w.product)} choisies à la main</span><span class="spacer"></span>${w.editId ? '' : '<button class="btn sm" data-a="lpick">Vente en gros</button>'}</div>${manual()}`
+        : `<div class="qbar"><label class="field" for="lw-qty" style="flex:1;min-width:180px;max-width:260px">Quantité à vendre (${esc(u)})<input class="inp num" id="lw-qty" data-c="lqty" type="number" min="1" max="${avail}" inputmode="numeric" value="${esc(w.qty)}" placeholder="0"></label>
+          ${[10, 100, 1000].map(n => `<button class="btn sm" data-a="lqtyadd" data-n="${n}">+${fmtQty(n)}</button>`).join('')}<button class="btn sm" data-a="lqtyadd" data-n="all">Tout (${fmtQty(avail)})</button></div>
+        <p class="hint" style="margin:0">Les ${esc(u)} sont pris dans les récoltes les plus anciennes : leurs créateurs seront notés dans le bilan. <button class="btn ghost sm" data-a="lpick">Choisir les récoltes à la main</button></p>
+        <div id="lw-alloc">${lwAllocHtml(w)}</div>`}
+      <label class="field" for="lw-extra" style="max-width:320px">Autres ${esc(u)} (pas dans le stock)<input class="inp num" id="lw-extra" data-c="lextra" type="number" min="0" value="${esc(w.extra)}" placeholder="0"></label>
+      <div class="toolbar"><span class="lbl">Total vendu : <b class="num" id="lw-tot">${fmtQty(lwPochons(w))}</b> ${esc(u)}</span></div>`;
   }
   if (w.step === 1) return lwTeam(w, `vendeur${w.people.length > 1 ? 's' : ''} présent${w.people.length > 1 ? 's' : ''}`);
-  const v = lwRecord(w);
+  const v = lwRecord(w), u = v.unit;
   return `<div class="cols"><div class="stack">
-      <div class="kpi"><small>Pochons créés par</small><b style="font-size:15px">${esc(list2(v.creators))}</b><span>${fmtQty(v.pochons)} pochons vendus</span></div>
+      <div class="kpi"><small>${esc(v.product)} · créés par</small><b style="font-size:15px">${esc(list2(v.creators))}</b><span>${fmtQty(v.pochons)} ${esc(u)} vendus</span></div>
       ${w.people.map(p => `<div class="sellrow"><b>${esc(p)}</b>
-        <label class="field">Pochons<input class="inp num" data-c="lshare" data-n="${esc(p)}" type="number" min="0" value="${esc(w.shares[p] != null ? w.shares[p] : 0)}" style="width:90px"></label>
+        <label class="field">${esc(cap1(u))}<input class="inp num" data-c="lshare" data-n="${esc(p)}" type="number" min="0" value="${esc(w.shares[p] != null ? w.shares[p] : 0)}" style="width:100px"></label>
         <label class="field" style="flex:1;min-width:140px">Argent gagné ($)<input class="inp num" data-c="lmoney" data-n="${esc(p)}" inputmode="numeric" placeholder="60.000" value="${esc(w.money[p] ? money(parseMoney(w.money[p])) : '')}"></label></div>`).join('')}
       <div class="toolbar"><span class="lbl">Total gagné : <b class="num" id="lw-money">${money(v.total)} $</b></span><span class="spacer"></span><span class="lbl" id="lw-sharechk" style="color:${v.sellers.reduce((s, x) => s + x.pochons, 0) === v.pochons ? 'var(--muted)' : 'var(--warn)'}">Répartis : ${fmtQty(v.sellers.reduce((s, x) => s + x.pochons, 0))} / ${fmtQty(v.pochons)}</span></div>
-    </div><div class="stack"><div class="row"><span class="field" style="flex:1">Message pour #bilan-activité</span><button class="btn sm" data-a="lcopywiz">${ic('copy')}Copier pour Discord</button></div><pre class="disc" id="ldisc">${esc(venteText(v))}</pre></div></div>`;
+    </div>${discBox(venteText(v))}</div>`;
+}
+function lwCanNext(w){
+  if (w.kind === 'recolte') return w.step === 0 ? w.people.length > 0 : true;
+  return w.step === 0 ? lwPochons(w) > 0 && !lwOver(w) : w.step === 1 ? w.people.length > 0 : true;
 }
 function renderLabWiz(){
   const root = $('#modal');
   if (!S.lw) { if (!S.wiz && !S.loginOpen && !S.secOpen) root.innerHTML = ''; return; }
-  const w = S.lw; const steps = LW_STEPS[w.kind]; const last = w.step === steps.length - 1;
-  const canNext = w.kind === 'recolte' ? (w.step === 0 ? w.people.length > 0 : true) : (w.step === 0 ? lwPochons(w) > 0 : w.step === 1 ? w.people.length > 0 : true);
+  const w = S.lw; const steps = lwSteps(w); const last = w.step === steps.length - 1;
   const scroll = root.querySelector('.ov') ? root.querySelector('.ov').scrollTop : 0;
-  const title = (w.editId ? 'Corriger : ' : '') + (w.kind === 'recolte' ? 'Récolte' : 'Vente');
+  const hot = lwHot(w);
+  const title = (w.editId ? 'Corriger : ' : '') + (w.kind === 'vente' ? 'Vente' : hot ? 'Récolte points chauds' : 'Récolte');
   root.innerHTML = `<div class="ov" role="dialog" aria-modal="true" aria-label="${title}"><div class="wiz">
-    <div class="wiz-h" style="--h:${w.kind === 'recolte' ? 270 : 140}">${art(w.kind === 'recolte' ? 'labo' : 'bank')}<div><div class="live-k"><i></i>LABORATOIRE</div><h3>${title}</h3><p>${w.kind === 'recolte' ? 'Les présents créent les pochons' : 'Les vendeurs écoulent les pochons du stock'}</p></div>
+    <div class="wiz-h" style="--h:${w.kind === 'vente' ? 140 : hot ? 105 : 270}">${art(w.kind === 'vente' ? 'bank' : hot ? 'leaf' : 'labo')}<div><div class="live-k"><i></i>LABORATOIRE</div><h3>${title}</h3><p>${w.kind === 'vente' ? 'Les vendeurs écoulent le stock' : hot ? 'Chacun note ce qu\'il a ramassé aux points chauds' : 'Les présents créent les pochons'}</p></div>
       <button class="btn sm wiz-x" data-a="lclose">${ic('x')}Fermer</button></div>
     <div class="steps">${steps.map((st, i) => `<button data-a="lstep" data-to="${i}" ${i === w.step ? 'aria-current="step"' : ''} class="${i < w.step ? 'done' : ''}"><b>${i < w.step ? ic('check') : i + 1}</b>${st}</button>`).join('')}</div>
     <div class="wiz-b">${lwBody(w)}</div>
     <div class="wiz-f"><span class="spacer"></span>
       ${w.step > 0 ? `<button class="btn" data-a="lstep" data-to="${w.step - 1}">${ic('left')}Précédent</button>` : ''}
-      ${!last ? `<button class="btn pri" data-a="lstep" data-to="${w.step + 1}" ${canNext ? '' : 'disabled'}>Suivant${ic('right')}</button>` : `<button class="btn pri" data-a="lsave">${ic('check')}Enregistrer le bilan</button>`}
+      ${!last ? `<button class="btn pri" data-a="lstep" data-to="${w.step + 1}" ${lwCanNext(w) ? '' : 'disabled'}>Suivant${ic('right')}</button>` : `<button class="btn pri" data-a="lsave">${ic('check')}Enregistrer le bilan</button>`}
     </div></div></div>`;
   const ov = root.querySelector('.ov'); if (ov) ov.scrollTop = scroll;
 }
@@ -2124,18 +2238,23 @@ function lwRefresh(){ // met à jour l'aperçu sans tout redessiner (garde le fo
   const w = S.lw; if (!w) return; const v = lwRecord(w);
   const d = $('#ldisc'); if (d) d.textContent = w.kind === 'recolte' ? recolteText(v) : venteText(v);
   const t = $('#lw-tot'); if (t) t.textContent = fmtQty(lwPochons(w));
+  const h = $('#lw-hot'); if (h) h.textContent = fmtQty(v.pochons);
+  const hs = $('#lw-hot-s'); if (hs) hs.textContent = `unités${v.product ? ' de ' + v.product : ''} ajoutées au stock à vendre`;
+  const al = $('#lw-alloc'); if (al) al.innerHTML = lwAllocHtml(w);
   const m = $('#lw-money'); if (m) m.textContent = money(v.total) + ' $';
   const c = $('#lw-sharechk'); if (c && v.sellers) { const sum = v.sellers.reduce((s, x) => s + x.pochons, 0); c.textContent = `Répartis : ${fmtQty(sum)} / ${fmtQty(v.pochons)}`; c.style.color = sum === v.pochons ? 'var(--muted)' : 'var(--warn)'; }
-  const nx = document.querySelector('#modal [data-a="lstep"][data-to="1"].pri'); if (nx && w.kind === 'vente' && w.step === 0) nx.disabled = !(lwPochons(w) > 0);
+  const nx = document.querySelector('#modal [data-a="lstep"][data-to="1"].pri'); if (nx && w.step === 0) nx.disabled = !lwCanNext(w);
 }
 async function lwSave(){
   const w = S.lw; if (!w || !me()) return;
   const rec = lwRecord(w);
-  if (!rec.pochons) { toast('Indique le nombre de pochons.'); return; }
+  if (lwHot(w) && !String(w.product || '').trim()) { toast('Indique le produit récolté.'); return; }
+  if (!rec.pochons) { toast(lwHot(w) ? 'Indique combien chacun a récolté.' : 'Indique le nombre de pochons.'); return; }
   if (w.kind === 'vente') {
-    for (const s of rec.sources) { const r = S.labs.find(x => x.id === s.id); const prev = w.editId ? (((S.labs.find(x => x.id === w.editId) || {}).sources || []).find(x => x.id === s.id) || {}).qty || 0 : 0;
-      if (r && s.qty > remainingOf(r) + prev) { toast(`Il ne reste que ${remainingOf(r) + prev} pochons dans cette récolte.`); return; } }
-    if (rec.sellers.reduce((s, x) => s + x.pochons, 0) !== rec.pochons) { toast('La répartition des pochons entre vendeurs ne fait pas le total.'); return; }
+    if (lwOver(w)) { toast(`Il n'y a que ${fmtQty(lwAvail(w))} ${rec.unit} de ${rec.product} en stock.`); return; }
+    for (const s of rec.sources) { const r = S.labs.find(x => x.id === s.id); const prev = lwBack(w, s.id);
+      if (r && s.qty > remainingOf(r) + prev) { toast(`Il ne reste que ${remainingOf(r) + prev} ${unitOf(r)} dans cette récolte.`); return; } }
+    if (rec.sellers.reduce((s, x) => s + x.pochons, 0) !== rec.pochons) { toast(`La répartition des ${rec.unit} entre vendeurs ne fait pas le total.`); return; }
     if (!rec.total) { toast("Indique l'argent gagné."); return; }
   }
   const old = w.editId ? S.labs.find(x => x.id === w.editId) : null;
@@ -2147,49 +2266,74 @@ async function lwSave(){
   const text = w.kind === 'recolte' ? recolteText(d) : venteText(d);
   S.lw = null; renderLabWiz(); render();
   const ok = await Store.write('labs/' + id, d);
-  if (ok) copy(text, null);
+  if (ok) copy(text, null, d.source === 'hotspot' ? `Récolte enregistrée : ${fmtQty(d.pochons)} ${d.unit} de ${d.product} ajoutés au stock. Message copié.` : null);
 }
 function labRecCard(x){
-  const isV = x.kind === 'vente'; const k = 'ldel:' + x.id;
-  const head = isV ? `<h4>Vente · ${esc(x.product || 'Fentanyl')}</h4><span class="st-pill ok">${fmtQty(x.pochons)} vendus</span>` : `<h4>Récolte · ${esc(x.product || 'Fentanyl')}</h4><span class="st-pill info">${fmtQty(x.pochons)} créés</span>`;
+  const isV = x.kind === 'vente', hot = x.source === 'hotspot'; const k = 'ldel:' + x.id; const u = labUnit(x), p = labProd(x);
+  const head = isV ? `<h4>Vente · ${esc(p)}</h4><span class="st-pill ok">${fmtQty(x.pochons)} ${esc(u)} vendus</span>`
+    : `<h4>${hot ? 'Récolte points chauds' : 'Récolte'} · ${esc(p)}</h4><span class="st-pill info">${fmtQty(x.pochons)} ${esc(u)} ${hot ? 'récoltés' : 'créés'}</span>`;
+  const pp = x.perPerson || {};
   const people = isV ? (x.sellers || []).map(s => `<span class="pc" style="--pc:var(--ok)">${esc(s.name)} <small>${fmtQty(s.pochons)} · ${money(s.money)} $</small></span>`).join('') + (x.creators || []).map(n => `<span class="pc" style="--pc:var(--p-neg)">${esc(n)} <small>créateur</small></span>`).join('')
-    : (x.people || []).map(n => `<span class="pc" style="--pc:var(--p-neg)">${esc(n)}</span>`).join('');
+    : (x.people || []).map(n => `<span class="pc" style="--pc:${hot ? 'var(--p-poly)' : 'var(--p-neg)'}">${esc(n)}${hot && pp[n] != null ? ` <small>${fmtQty(pp[n])}</small>` : ''}</span>`).join('');
   const left = isV ? null : remainingOf(x);
-  return `<article class="opc ${isV ? '' : 'rec'}" style="--h:${isV ? 140 : 270}"><span class="bar"></span><div class="in">
+  return `<article class="opc ${isV ? '' : 'rec'}" style="--h:${isV ? 140 : hot ? 105 : 270}"><span class="bar"></span><div class="in">
     <div class="op-h">${head}<span class="meta">${fmtDT(x.at)} · par ${esc(x.by || '?')}${x.corrected ? ` · corrigé par ${esc(x.corrected.by)}` : ''}</span>${isV ? `<span class="tot">${money(x.total)} $</span>` : `<span class="meta" style="margin-left:auto">${left ? `${fmtQty(left)} en stock` : 'tout vendu'}</span>`}</div>
     <div class="chips">${people}</div>
     <div class="row"><span class="spacer"></span><button class="btn sm" data-a="lcopy" data-id="${esc(x.id)}">${ic('copy')}Copier pour Discord</button>
       ${isExec() ? `<button class="btn ghost sm" data-a="ledit" data-id="${esc(x.id)}">Corriger</button>` + (S.confirm === k ? `<button class="btn red sm" data-a="ldel" data-id="${esc(x.id)}">Confirmer la suppression</button><button class="btn sm" data-a="noconfirm">Garder</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}" aria-label="Supprimer">${ic('trash')}</button>`) : ''}</div>
   </div></article>`;
 }
+// Ventes dont le nom enregistré ne correspond pas à celui de leurs récoltes.
+const misnamedVentes = () => labRecs('vente').filter(v => !sameProd(prodOf(v), labProd(v)) || (!v.unit && labUnit(v) !== 'pochons'));
+// Outil admin : liste des produits, avec renommage partout (récoltes et ventes).
+function labNamesPanel(){
+  if (!isAdmin()) return '';
+  const rows = knownProducts().map(p => { const r = labRecs('recolte').filter(x => sameProd(prodOf(x), p)).length, v = labRecs('vente').filter(x => sameProd(labProd(x), p)).length;
+    if (!r && !v) return '';
+    return `<div class="prn"><span><b>${esc(p)}</b><small>${r} récolte${r > 1 ? 's' : ''} · ${v} vente${v > 1 ? 's' : ''} · ${fmtQty(stockOf(p))} en stock</small></span>
+      <input class="inp" value="${esc(p)}" maxlength="30" aria-label="Nouveau nom pour ${esc(p)}"><button class="btn sm" data-a="lrename" data-p="${esc(p)}">Renommer</button></div>`; }).join('');
+  const bad = misnamedVentes().length;
+  return `<div class="panel"><h3>Noms des produits</h3><p class="hint">Admins : corrige le nom d'un produit partout (récoltes, ventes et messages Discord).</p>
+    ${rows || '<p class="hint" style="margin:0">Aucun produit pour l\'instant.</p>'}
+    ${bad ? `<div class="banner" style="margin:12px 0 8px">${ic('alert')}<span>${bad} vente${bad > 1 ? 's' : ''} enregistrée${bad > 1 ? 's' : ''} sous un autre nom que leur récolte.</span></div><button class="btn sm" data-a="lfixnames">${ic('check')}Corriger ${bad > 1 ? 'ces ventes' : 'cette vente'}</button>` : ''}</div>`;
+}
+// Réécrit plusieurs bilans du labo d'un coup (par paquets, pour rester sous la limite de Firestore).
+async function labBulk(changes, msg){
+  if (!changes.length || !me()) return false;
+  const list = changes.map(([x, patch]) => { const d = Object.assign({}, x, patch, {lastById:me().id, lastAt:Date.now()}); delete d.id; return {path:'labs/' + x.id, data:d}; });
+  changes.forEach(([x, patch]) => Object.assign(x, patch)); render();
+  for (let i = 0; i < list.length; i += 200) if (!(await Store.batch(list.slice(i, i + 200)))) return false;
+  toast(msg); return true;
+}
 function labsMain(){
   const recs = labRecs('recolte'), vts = labRecs('vente');
   const inP = x => inPeriod(x.at);
-  const stock = stockList().reduce((s, r) => s + r.left, 0);
+  const sp = stockByProduct();
+  const stock = sp.reduce((s, p) => s + p.qty, 0);
   const made = recs.filter(inP).reduce((s, r) => s + (r.pochons || 0), 0);
   const sold = vts.filter(inP).reduce((s, v) => s + (v.pochons || 0), 0);
   const cash = vts.filter(inP).reduce((s, v) => s + (v.total || 0), 0);
   const prod = {}, sell = {};
-  recs.filter(inP).forEach(r => (r.people || []).forEach(n => { prod[n] = (prod[n] || 0) + (r.pochons || 0) / Math.max(1, (r.people || []).length); }));
+  recs.filter(inP).forEach(r => (r.people || []).forEach(n => { const pp = r.perPerson; prod[n] = (prod[n] || 0) + (pp && pp[n] != null ? pp[n] : (r.pochons || 0) / Math.max(1, (r.people || []).length)); }));
   vts.filter(inP).forEach(v => (v.sellers || []).forEach(s => { sell[s.name] = (sell[s.name] || 0) + (s.money || 0); }));
   const lbHtml = (o, fmt) => { const e = Object.entries(o).sort((a, b) => b[1] - a[1]); const mx = e.length ? e[0][1] || 1 : 1;
     return e.length ? `<div class="lb">${e.map(([n, v], i) => `<div class="lb-r"><span class="rk">${i + 1}</span><span class="nm"><span>${esc(n)}</span><span class="track"><i style="width:${Math.max(4, v / mx * 100)}%"></i></span></span><span class="v">${fmt(v)}</span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Personne pour l\'instant.</p>'; };
   const plabel = {week:'cette semaine', month:'ce mois-ci', all:'depuis le début'}[S.period];
   const all = recs.concat(vts).filter(inP).sort((a, b) => b.at - a.at);
-  const st = stockList();
-  return `<div class="row" style="margin-bottom:14px;gap:10px"><button class="btn pri" data-a="lnew" data-k="recolte">${ic('flask')}Nouvelle récolte</button><button class="btn ok" data-a="lnew" data-k="vente" ${stock || true ? '' : 'disabled'}>${ic('wallet')}Nouvelle vente</button><span class="spacer"></span>
+  return `<div class="row" style="margin-bottom:14px;gap:10px"><button class="btn pri" data-a="lnew" data-k="recolte">${ic('flask')}Nouvelle récolte</button><button class="btn" data-a="lnew" data-k="recolte" data-src="hotspot">${ic('plus')}Récolte points chauds</button><button class="btn ok" data-a="lnew" data-k="vente">${ic('wallet')}Nouvelle vente</button><span class="spacer"></span>
       <div class="seg" role="group" aria-label="Période"><button data-a="period" data-p="week" aria-pressed="${S.period==='week'}">Cette semaine</button><button data-a="period" data-p="month" aria-pressed="${S.period==='month'}">Ce mois</button><button data-a="period" data-p="all" aria-pressed="${S.period==='all'}">Tout</button></div></div>
     <div class="kpis">
-      <div class="kpi"><small>Pochons en stock</small><b>${fmtQty(stock)}</b><span>créés, pas encore vendus</span></div>
-      <div class="kpi"><small>Pochons créés</small><b>${fmtQty(made)}</b><span>${plabel}</span></div>
-      <div class="kpi"><small>Pochons vendus</small><b>${fmtQty(sold)}</b><span>${plabel}</span></div>
+      <div class="kpi"><small>En stock</small><b>${fmtQty(stock)}</b><span>${sp.length ? sp.slice(0, 3).map(p => `${fmtQty(p.qty)} ${esc(p.product.toLowerCase())}`).join(' · ') : 'rien à vendre'}</span></div>
+      <div class="kpi"><small>Créés / récoltés</small><b>${fmtQty(made)}</b><span>${plabel}</span></div>
+      <div class="kpi"><small>Vendus</small><b>${fmtQty(sold)}</b><span>${plabel}</span></div>
       <div class="kpi"><small>Argent des ventes</small><b>${money(cash)} $</b><span>${plabel}</span></div>
     </div>
     <div class="cols"><div class="stack">
-      ${all.length ? all.map(labRecCard).join('') : `<div class="empty"><strong>Rien ${plabel}</strong>Commence par « Nouvelle récolte » quand des pochons sont créés.</div>`}
+      ${all.length ? all.map(labRecCard).join('') : `<div class="empty"><strong>Rien ${plabel}</strong>Commence par « Nouvelle récolte » ou « Récolte points chauds ».</div>`}
     </div><div class="stack">
-      <div class="panel"><h3>Stock à vendre</h3>${st.length ? `<div class="hist">${st.map(r => `<div class="hist-r"><span><b>${fmtQty(r.left)} pochons</b> · ${esc(r.product || 'Fentanyl')}<br><small>Créés par ${esc(list2(r.people || []))} · ${fmtD(r.at)}</small></span></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Aucun pochon en attente de vente.</p>'}</div>
-      <div class="panel"><h3>Création (pochons) ${plabel}</h3><p class="hint">Pochons d'une récolte partagés entre les présents.</p>${lbHtml(prod, v => fmtQty(Math.round(v)))}</div>
+      <div class="panel"><h3>Stock à vendre</h3>${sp.length ? `<div class="hist">${sp.map(p => `<div class="hist-r"><span><b>${esc(p.product)}</b> · ${fmtQty(p.qty)} ${esc(p.unit)}<br><small>${p.n} récolte${p.n > 1 ? 's' : ''} pas encore vendue${p.n > 1 ? 's' : ''}</small></span><button class="btn ok sm" data-a="lnew" data-k="vente" data-p="${esc(p.product)}">Vendre</button></div>`).join('')}</div>` : '<p class="hint" style="margin:0">Rien en attente de vente.</p>'}</div>
+      ${labNamesPanel()}
+      <div class="panel"><h3>Création ${plabel}</h3><p class="hint">Pochons d'une récolte partagés entre les présents, ou unités ramassées par chacun aux points chauds.</p>${lbHtml(prod, v => fmtQty(Math.round(v)))}</div>
       <div class="panel"><h3>Ventes ($) ${plabel}</h3>${lbHtml(sell, v => money(v) + ' $')}</div>
     </div></div>`;
 }
@@ -2396,10 +2540,23 @@ const A = {
   armpaste(t){ S.pasteSlot = S.pasteSlot === t.dataset.slot ? null : t.dataset.slot; render(); if (S.pasteSlot) toast("Fais maintenant Ctrl+V pour coller ta capture d'écran."); },
   imgview(t){ const src = imgCache[t.dataset.id]; if (src && src !== 'none') openLightbox(src); },
   lbclose(){ const lb = $('#lightbox'); if (lb) lb.hidden = true; },
-  lnew(t){ if (!me()) return; S.lw = newLabWiz(t.dataset.k); renderLabWiz(); },
+  lnew(t){ if (!me()) return; const w = newLabWiz(t.dataset.k, t.dataset.src); if (t.dataset.p) { w.product = t.dataset.p; w.qty = String(stockOf(t.dataset.p)); } S.lw = w; renderLabWiz(); },
+  lprodsel(t){ const w = S.lw; if (!w || sameProd(w.product, t.dataset.p)) return; w.product = t.dataset.p; w.sources = {}; w.qty = w.pick ? '' : String(stockOf(w.product)); renderLabWiz(); },
+  lqtyadd(t){ const w = S.lw; if (!w) return; const av = lwAvail(w); w.qty = String(t.dataset.n === 'all' ? av : Math.min(av, (parseInt(w.qty, 10) || 0) + Number(t.dataset.n))); renderLabWiz(); },
+  lpick(){ const w = S.lw; if (!w || w.kind !== 'vente') return;
+    if (!w.pick) { w.sources = Object.fromEntries(lwSources(w).map(s => [s.id, String(s.qty)])); w.pick = true; }
+    else if (!w.editId) { w.qty = String(lwSources(w).reduce((s, x) => s + x.qty, 0)); w.sources = {}; w.pick = false; }
+    renderLabWiz(); },
+  lrename(t){ if (!isAdmin()) return; const from = t.dataset.p; const row = t.closest('.prn'); const inp = row && row.querySelector('input');
+    const to = ((inp && inp.value) || '').trim().slice(0, 30); if (!to || to === from) return;
+    const docs = S.labs.filter(x => x.kind && (sameProd(prodOf(x), from) || sameProd(labProd(x), from)));
+    labBulk(docs.map(x => [x, {product:to, recipe:slug(to)}]), `${from} renommé en ${to} (${docs.length} bilan${docs.length > 1 ? 's' : ''}).`); },
+  lfixnames(){ if (!isAdmin()) return; const l = misnamedVentes();
+    labBulk(l.map(v => [v, {product:labProd(v), recipe:slug(labProd(v)), unit:labUnit(v)}]), `${l.length} vente${l.length > 1 ? 's' : ''} corrigée${l.length > 1 ? 's' : ''}.`); },
   lclose(){ S.lw = null; renderLabWiz(); },
   lstep(t){ const w = S.lw; if (!w) return; const to = Number(t.dataset.to);
     if (w.kind === 'vente' && to >= 1 && !(lwPochons(w) > 0)) return;
+    if (w.kind === 'vente' && to >= 1 && lwOver(w)) { toast(`Il n'y a que ${fmtQty(lwAvail(w))} en stock.`); return; }
     if (to > w.step && w.kind === 'recolte' && w.step === 0 && !w.people.length) return;
     if (w.kind === 'vente' && to === 2) { if (!w.people.length) return; const sum = w.people.reduce((s, p) => s + (parseInt(w.shares[p], 10) || 0), 0); if (sum !== lwPochons(w) || w.people.some(p => w.shares[p] == null)) lwSplit(w); }
     w.step = to; renderLabWiz(); const ov = $('#modal .ov'); if (ov) ov.scrollTop = 0; },
@@ -2413,9 +2570,9 @@ const A = {
   lcopywiz(){ const w = S.lw; if (!w) return; const v = lwRecord(w); copy(w.kind === 'recolte' ? recolteText(v) : venteText(v), $('#ldisc')); },
   lcopy(t){ const x = S.labs.find(y => y.id === t.dataset.id); if (x) copy(x.kind === 'vente' ? venteText(x) : recolteText(x), null); },
   ledit(t){ const x = S.labs.find(y => y.id === t.dataset.id); if (!x || !isExec()) return;
-    const w = newLabWiz(x.kind); w.editId = x.id; w.product = x.product || 'Fentanyl';
-    if (x.kind === 'recolte') { w.people = (x.people || []).slice(); w.pochons = String(x.pochons || ''); w.step = 1; }
-    else { w.people = (x.sellers || []).map(s => s.name); (x.sources || []).forEach(s => { w.sources[s.id] = String(s.qty); }); w.extra = x.extra ? String(x.extra) : '';
+    const w = newLabWiz(x.kind, x.source); w.editId = x.id; w.product = labProd(x);
+    if (x.kind === 'recolte') { w.people = (x.people || []).slice(); w.pochons = String(x.pochons || ''); if (x.source === 'hotspot') w.per = Object.assign({}, x.perPerson || {}); w.step = 1; }
+    else { w.pick = true; w.qty = ''; w.people = (x.sellers || []).map(s => s.name); (x.sources || []).forEach(s => { w.sources[s.id] = String(s.qty); }); w.extra = x.extra ? String(x.extra) : '';
       (x.sellers || []).forEach(s => { w.shares[s.name] = s.pochons; w.money[s.name] = String(s.money || ''); }); w.step = 2; }
     S.lw = w; renderLabWiz(); },
   ldel(t){ const x = S.labs.find(y => y.id === t.dataset.id); S.confirm = null; if (!x || !isExec()) return;
@@ -2560,7 +2717,8 @@ document.addEventListener('input', e => {
   if (t.dataset.c === 'logq') { S.logQ = t.value; render(); const i = $('#log-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } return; }
   if (t.dataset.c === 'tgt' && S.wiz) { S.wiz.targetOrg = t.value; saveWiz(); const d = $('#disc'); if (d) d.textContent = discordText(opFromWiz(S.wiz)); return; }
   if (t.dataset.c === 'orgq') { S.orgQ = t.value; render(); const i = $('#org-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } return; }
-  if (S.lw && ['lprod','lpoch','lsrcq','lextra','lshare','lmoney'].includes(t.dataset.c)) { const w = S.lw, c = t.dataset.c;
+  if (S.lw && ['lprod','lpoch','lsrcq','lextra','lshare','lmoney','lper','lqty'].includes(t.dataset.c)) { const w = S.lw, c = t.dataset.c;
+    if (c === 'lper') w.per[t.dataset.n] = t.value.replace(/\D/g, ''); if (c === 'lqty') w.qty = t.value.replace(/\D/g, '');
     if (c === 'lprod') w.product = t.value; if (c === 'lpoch') w.pochons = t.value.replace(/\D/g, ''); if (c === 'lextra') w.extra = t.value;
     if (c === 'lsrcq') w.sources[t.dataset.id] = t.value; if (c === 'lshare') w.shares[t.dataset.n] = t.value; if (c === 'lmoney') w.money[t.dataset.n] = t.value;
     lwRefresh(); return; }
