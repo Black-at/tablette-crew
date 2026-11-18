@@ -12,7 +12,7 @@ rules_version = '2';
 // Droits selon le grade (crews/<crew>/members/<id>) :
 //   Admin du site : tout, y compris les codes et le journal (sauf modifier le fondateur).  Patron / Co-Patron : tout sauf les codes.
 //   Exécutant : OP, roue, formations, sanctions, grade et renvoi des Membres/Lieutenants, objets du coffre.
-//   Lieutenant / Membre : lecture, lancer les missions ouvertes (supérette, ATM, conteneur), s'inscrire à une formation, cocher la roue à son tour,
+//   Lieutenant / Membre : lecture, lancer les missions ouvertes (supérette, ATM, conteneur), remplir sa fiche RP, s'inscrire à une formation, cocher la roue à son tour,
 //   déposer/retirer dans le coffre, changer son mot de passe.
 // Rien n'est jamais supprimé définitivement.
 service cloud.firestore {
@@ -75,11 +75,27 @@ service cloud.firestore {
         || (L == 2 && canTarget(L, resource.data) && d.grade in ['Membre', 'Lieutenant'] && onlyKeys(['grade', 'removed', '_p', '_k']))
         || (L >= 1 && mid == myId(c) && onlyKeys(['kv', 'pwChanged', '_p', '_k']) && d.get('kv', 0) == resource.data.get('kv', 0) + 1);
     }
+    // Sanction : par un Exécutant et plus, ou sanction automatique (fiche RP sans carte d'identité)
+    // que le membre se donne lui-même (auto == 'id').
     function sanctionCreate(c) {
       let L = lvl(c);
       let d = request.resource.data;
-      return L >= 2 && d.memberId != myId(c) && d.byId == myId(c) && d.type in ['rappel', 'avert']
-        && canTarget(L, member(c, d.memberId));
+      return d.byId == myId(c) && d.type in ['rappel', 'avert'] && (
+        (L >= 2 && d.memberId != myId(c) && canTarget(L, member(c, d.memberId)))
+        || (L >= 1 && d.memberId == myId(c) && d.get('auto', '') == 'id'));
+    }
+    // Annulation : Patron / Co-Patron, ou retrait automatique d'une sanction « fiche RP » quand la carte d'identité est ajoutée
+    // (par le membre lui-même ou un Exécutant et plus).
+    function sanctionCancel(c) {
+      let L = lvl(c);
+      return onlyKeys(['cancelled', 'cancelledBy', 'cancelledAt', '_p', '_k']) && (L >= 3
+        || (L >= 1 && resource.data.get('auto', '') == 'id' && (L >= 2 || resource.data.memberId == myId(c))
+            && get(/databases/$(database)/documents/crews/$(c)/ident/$(resource.data.memberId)).data.get('img', '') != ''));
+    }
+    // Fiche RP : chacun remplit la sienne ; Patron / Co-Patron et admins peuvent corriger.
+    function identWrite(c, mid) {
+      let L = lvl(c);
+      return L >= 3 || (L >= 1 && mid == myId(c) && request.resource.data.get('byId', '') == myId(c));
     }
     // Formations : le membre demande / annule pour lui-même ; un formateur désigné (config.trainers)
     // accepte, refuse, valide ou fait refaire pour les autres ; les Exécutants et plus peuvent tout faire.
@@ -203,7 +219,7 @@ service cloud.firestore {
       match /sanctions/{id} {
         allow read: if okCode(c);
         allow create: if sanctionCreate(c);
-        allow update: if lvl(c) >= 3 && onlyKeys(['cancelled', 'cancelledBy', 'cancelledAt', '_p', '_k']);
+        allow update: if sanctionCancel(c);
         allow delete: if false;
       }
       match /inv/{id} {
@@ -224,6 +240,12 @@ service cloud.firestore {
       match /intel/{id} {
         allow read: if okCode(c);
         allow create, update: if trackedWrite(c);
+        allow delete: if false;
+      }
+      // Fiches RP (prénom, nom, téléphone, carte d'identité) : une par membre.
+      match /ident/{mid} {
+        allow read: if okCode(c);
+        allow create, update: if identWrite(c, mid);
         allow delete: if false;
       }
       match /intelimg/{id} {

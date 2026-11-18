@@ -519,6 +519,7 @@ const I = {
   shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
   info:'<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
   user:'<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>',
+  phone:'<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/>',
   logout:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
   zap:'<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
   timer:'<path d="M10 2h4M12 14l3-3"/><circle cx="12" cy="14" r="8"/>',
@@ -770,13 +771,14 @@ function markSynced(){ if (!Store.synced) { Store.synced = true; renderSync(); }
 function syncError(e, what){ S.syncErr = {code: (e && e.code) || '', what: what || ''}; renderSync(); renderTop(); }
 
 /* ---------- Journal (logs) : une ligne par modification, écrite avec la modification elle-même ---------- */
-const LOG_SEC = {members:'Membres', ops:'Bilans', live:'OP en cours', coffre:'Roue du coffre', formations:'Formations', sanctions:'Sanctions', inv:'Coffre', labs:'Laboratoires', intel:'Renseignements', crew:'Paramètres', comptes:"Codes d'accès"};
+const LOG_SEC = {members:'Membres', ops:'Bilans', live:'OP en cours', coffre:'Roue du coffre', formations:'Formations', sanctions:'Sanctions', inv:'Coffre', labs:'Laboratoires', intel:'Renseignements', ident:'Fiches RP', crew:'Paramètres', comptes:"Codes d'accès"};
 // Champs jamais recopiés dans le journal (techniques, ou secrets comme les mots de passe et les photos).
 const LOG_SKIP = new Set(['_p','_k','_del','id','at','updatedAt','lastAt','lastById','lastBy','by','byId','password','data','k','history','vault','kv','editedBy','editedById','editedAt']);
 const LOG_FR = {name:'nom', grade:'grade', removed:'viré', admin:'admin', pwChanged:'mot de passe changé', crewName:'nom du crew', crewLevel:'niveau du crew',
   coffreItems:'contenu du coffre', coffreExclude:'exclus de la roue', coffreExcludeLast:'exclure le dernier', trainers:'formateurs', labSites:'labos', recipes:'recettes',
   qty:'quantité', min:'minimum', cat:'catégorie', w:'poids', icon:'icône', place:'emplacement', status:'statut', session:'session', note:'note', reason:'raison',
   cancelled:'annulée', total:'total', participants:'participants', result:'résultat', missionName:'mission', targetOrg:'organisation visée', pochons:'pochons',
+  first:'prénom RP', last:'nom RP', phone:'téléphone RP', img:"carte d'identité", askedAt:'fiche demandée', kickAt:'déconnexion générale', kickKeep:'restés connectés', auto:'automatique',
   product:'produit', unit:'unité', perPerson:'par personne', source:'origine', sellers:'vendeurs', sources:'récoltes', color:'couleur', radio:'radio', threat:'menace', boss:'patron', villa:'villa', people:'membres connus',
   notes:'journal', claims:'revendique', items:'cases', member:'membre', memberId:'membre', trainer:'formateur', postes:'postes', vehicles:'véhicules'};
 const mNameOf = id => { const m = S.mdocs.find(x => x.id === id); return m ? m.name : (id || '?'); };
@@ -852,6 +854,7 @@ function logItem(op){
       break;
     case 'invlog': s = 'inv'; minor = true; t = `Historique du coffre : ${x.delta > 0 ? '+' : ''}${x.delta} ${x.item}`; break;
     case 'labs': t = `${x.kind === 'vente' ? 'Vente' : x.source === 'hotspot' ? 'Récolte points chauds' : 'Récolte'}${x.product ? ' « ' + x.product + ' »' : ''} ${verbF}${live && !del && changed('product') ? ' (renommée, avant : ' + live.product + ')' : ''} · ${x.pochons || 0} ${x.unit || 'pochons'}${x.kind === 'vente' && x.total ? ' · ' + money(x.total) + ' $' : ''}`; break;
+    case 'ident': t = `Fiche RP de ${mNameOf(id)} ${!live ? 'demandée' : changed('img') ? ": carte d'identité ajoutée" : 'modifiée'}${live && !changed('img') && fields() ? ' (' + fields() + ')' : ''}`; break;
     case 'intel': t = `Fiche ${x.name || id} ${verbF}${live && !del && fields() ? ' (' + fields() + ')' : ''}`; break;
     case 'intelimg': s = 'intel'; t = del ? 'Photo supprimée' : `Photo ajoutée${x.orgId ? ' (fiche ' + (((S.intel || []).find(o => o.id === x.orgId) || {}).name || x.orgId) + ')' : ''}`; return {s, t, p:path};
     case 'crew':
@@ -875,7 +878,8 @@ const S = {
   config: null, cfgLoaded:false, ops: [], live: [], coffre: [], forms: [],
   wiz: null, sel: null, confirm: null, period: 'week', spinning: false, pending: false,
   wheelRot: 0, idOpen: false, syncErr:false, slow:false, mdocs: [], vault: {}, reveal: {}, loginOpen: false, secOpen: false, myKey: null, intel: [], orgSel: null, orgQ: '', pasteSlot: null, lw: null, labs: [], labTab: 'synthese', labN: 1, labSite: null, labSub: 'prod', labEdit: null, invPlace: 'villa', invSeed: null, sanctions: [], sxType: 'avert', sxMember: '', sxReason: '', inv: [], invlog: [], invCat: 'all', invQ: '', invSel: null, mvN: 1, coffreTab: 'inv', vaultOn: false,
-  logs: [], logsOn: false, logsLoaded: false, logLimit: 150, logTab: 'journal', logWho: '', logSec: '', logQ: '', logMinor: false, admPick: '', meta: null, oe: null
+  logs: [], logsOn: false, logsLoaded: false, logLimit: 150, logTab: 'journal', logWho: '', logSec: '', logQ: '', logMinor: false, admPick: '', meta: null, oe: null,
+  ident: [], identLoaded: false, sxLoaded: false, identOpen: false, identSkip: false, identSig: '', identView: null, idDraft: {}, askWritten: false, freshLogin: false
 };
 const cfg = () => Object.assign({crewName:'Crew', crewLevel:1, members:[], coffreItems:DEFAULT_ITEMS, coffreExclude:[], coffreExcludeLast:true}, S.config || {});
 const members = () => S.mdocs.filter(m => !m.removed);
@@ -929,13 +933,14 @@ function renderTop(){
   if (Store.mode === 'local') notice = `<div class="banner">${ic('info')}Mode local : la base de données n'est pas encore configurée (fichier config.js). Les données restent sur cet appareil.</div>`;
   else if (S.syncErr && S.syncErr.code === 'permission-denied') notice = `<div class="banner">${ic('lock')}<span>Les règles de sécurité Firebase ne sont pas à jour (partie « ${esc(String(S.syncErr.what).split('/')[0])} » refusée). Recolle le fichier <b>firestore.rules</b> dans Firebase → Firestore Database → Règles → Publier, puis recharge la page.</span></div>`;
   else if (S.syncErr) notice = `<div class="banner">${ic('lock')}<span>Connexion aux données interrompue. Vérifie ta connexion internet puis recharge la page.</span></div>`;
-  $('#notice').innerHTML = notice;
+  $('#notice').innerHTML = notice + identBanners();
 }
 function render(){
   renderNav(); renderTop(); renderSync();
   const v = VIEWS[S.view] || VIEWS.missions;
   $('#view').innerHTML = v();
   if (S.view === 'coffre' && S.coffreTab === 'roue') drawWheel();
+  renderIdent();
 }
 function scheduleRender(){
   if (S.spinning) { S.pending = true; return; }
@@ -1509,11 +1514,12 @@ VIEWS.membres = () => {
   const rows = GRADES.flatMap(g => ms.filter(m => m.grade === g)).map(m => {
     const k = 'mdel:' + m.id; const can = canEditMember(m);
     const choices = gradeChoices();
-    return `<tr><td><b>${esc(m.name)}</b>${m.id === S.meId ? ' <span class="st-pill info">toi</span>' : ''}${m.admin ? ' <span class="st-pill wait">admin</span>' : ''}</td>
+    return `<tr><td><b>${esc(m.name)}</b>${boss && identOf(m.id) && identOf(m.id).first ? `<br><small style="color:var(--muted)">${esc(identOf(m.id).first + ' ' + (identOf(m.id).last || ''))}</small>` : ''}${m.id === S.meId ? ' <span class="st-pill info">toi</span>' : ''}${m.admin ? ' <span class="st-pill wait">admin</span>' : ''}</td>
       <td>${can ? `<select class="inp" data-c="mgrade" data-id="${esc(m.id)}" id="g-${esc(m.id)}" aria-label="Grade de ${esc(m.name)}">${choices.map(g => `<option ${g===m.grade?'selected':''} value="${g}">${GLABEL[g]||g}</option>`).join('')}</select>` : `<span class="grade" style="--gc:${GCOL[m.grade]}">${esc(GLABEL[m.grade]||m.grade)}</span>`}</td>
       <td>${fBadges(m.name) || '<span style="color:var(--dim)">—</span>'}</td>
       <td class="num">${opsCount(m.name)}</td><td class="num">${coffreCount(m.id)}</td><td class="num" style="color:${warnCount(m.id) ? 'var(--danger)' : 'var(--dim)'}">${warnCount(m.id)}/2</td>
-      <td style="text-align:right;white-space:nowrap">${can ? (S.confirm === k ? `<button class="btn red sm" data-a="mdel" data-id="${esc(m.id)}">Virer du crew</button> <button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}" aria-label="Virer ${esc(m.name)}">${ic('trash')}</button>`) : ''}</td></tr>`;
+      ${boss ? (() => { const st = identStatus(m); return `<td style="white-space:nowrap"><span class="st-pill ${st.cls}">${esc(st.t)}</span> <button class="btn ghost sm" data-a="idview" data-id="${esc(m.id)}" aria-pressed="${S.identView === m.id}">${S.identView === m.id ? 'Masquer' : 'Voir'}</button></td>`; })() : ''}
+      <td style="text-align:right;white-space:nowrap">${can ? (S.confirm === k ? `<button class="btn red sm" data-a="mdel" data-id="${esc(m.id)}">Virer du crew</button> <button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}" aria-label="Virer ${esc(m.name)}">${ic('trash')}</button>`) : ''}</td></tr>${boss && S.identView === m.id ? identRow(m) : ''}`;
   }).join('');
   const counts = GRADES.map(g => { const n = ms.filter(m => m.grade === g).length; return n ? `<span class="pc" style="--pc:${GCOL[g]}">${GLABEL[g]||g} <b class="num">${n}</b></span>` : ''; }).join('');
   const who = boss ? '' : exec ? `<div class="banner">${ic('info')}En tant qu'Exécutant, tu peux passer un membre Lieutenant ou Membre, et virer les Lieutenants et Membres.</div>`
@@ -1522,7 +1528,7 @@ VIEWS.membres = () => {
       <select class="inp" id="madd-grade" aria-label="Grade">${GRADES.map(g => `<option value="${g}" ${g==='Membre'?'selected':''}>${GLABEL[g]||g}</option>`).join('')}</select>
       <button class="btn pri" data-a="madd">${ic('plus')}Ajouter au crew</button></div>` : ''}
     ${ms.length ? `<div class="chips" style="margin-bottom:12px">${counts}</div>
-      <div class="panel"><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Grade</th><th>Formations</th><th>OP</th><th>Coffre</th><th>Avert.</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`
+      <div class="panel"><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Grade</th><th>Formations</th><th>OP</th><th>Coffre</th><th>Avert.</th>${boss ? '<th>Fiche RP</th>' : ''}<th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`
       : `<div class="empty"><strong>Chargement des membres…</strong></div>`}`;
 };
 
@@ -1545,6 +1551,7 @@ VIEWS.parametres = () => {
     <div class="stack">
       <div class="panel"><h3>Mon profil</h3><p class="hint">Ton identifiant : <b>${m ? esc(m.name) : '—'}</b> (ton nom dans le crew)</p>
         <div class="row"><b>${m ? esc(m.name) : '—'}</b>${m ? `<span class="grade" style="--gc:${GCOL[m.grade]}">${esc(GLABEL[m.grade]||m.grade)}</span>` : ''}${m && m.admin ? '<span class="st-pill wait">admin</span>' : ''}<span class="spacer"></span><button class="btn sm" data-a="logout">${ic('logout')}Se déconnecter</button></div>
+        ${m ? (() => { const d = identOf(m.id) || {}; const ok = identDone(d); return `<div class="row" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line)"><span style="flex:1;min-width:160px"><span class="field">Ma fiche RP</span><br><small style="color:var(--muted)">${ok ? esc(d.first + ' ' + d.last + ' · ' + d.phone) : "Prénom, nom, téléphone et carte d'identité à compléter"}</small></span><span class="st-pill ${ok ? 'ok' : 'fail'}">${ok ? 'Complète' : 'Incomplète'}</span><button class="btn sm" data-a="idopen">${ok ? 'Modifier' : 'Compléter'}</button></div>`; })() : ''}
         ${Store.mode === 'fire' && m ? `<div class="stack" style="gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)"><span class="field">Changer mon mot de passe</span>
           <input class="inp" id="pw-cur" type="password" autocomplete="current-password" placeholder="Mot de passe actuel" aria-label="Mot de passe actuel">
           <input class="inp" id="pw-new" type="password" autocomplete="new-password" placeholder="Nouveau mot de passe (8 caractères minimum)" aria-label="Nouveau mot de passe">
@@ -1616,8 +1623,10 @@ VIEWS.comptes = () => {
   const missing = ms.filter(m => !(m.kv >= 1) && m.id !== S.meId).length;
   return `<div class="banner">${ic('lock')}<span>Envoie à chaque membre <b>son</b> mot de passe en message privé (bouton « Copier »). Son identifiant est son nom dans le crew. Il pourra le changer dans Paramètres : tu ne le verras plus.</span></div>
     ${missing ? `<div class="toolbar" style="margin-bottom:14px"><span class="lbl">${missing} membre${missing>1?'s':''} sans mot de passe</span><span class="spacer"></span><button class="btn pri sm" data-a="mkallacc">${ic('plus')}Créer les mots de passe manquants</button></div>` : ''}
+    <div class="toolbar" style="margin-bottom:14px"><span class="lbl">Déconnecter tout le monde sauf toi${cfg().kickAt ? ` · dernière fois ${ago(cfg().kickAt)}` : ''}</span><span class="spacer"></span>
+      ${S.confirm === 'kick' ? `<button class="btn red sm" data-a="kickall">Confirmer : déconnecter tout le monde</button><button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn red sm" data-a="askconfirm" data-k="kick">${ic('logout')}Déconnecter tout le monde</button>`}</div>
     <div class="panel"><div class="tbl-wrap"><table><thead><tr><th>Membre (identifiant)</th><th>Grade</th><th>Mot de passe de départ</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="hint" style="margin:12px 0 0">« Réinitialiser » crée un nouveau mot de passe et désactive l'ancien immédiatement (oubli ou fuite). Un membre viré ne peut plus rien modifier.</p></div>`;
+    <p class="hint" style="margin:12px 0 0">« Déconnecter tout le monde » : chacun devra remettre son mot de passe (il ne change pas). « Réinitialiser » crée un nouveau mot de passe et désactive l'ancien immédiatement (oubli ou fuite). Un membre viré ne peut plus rien modifier.</p></div>`;
 };
 
 /* ---------- Logs (admins) : journal de tout ce qui a été modifié + gestion des admins ---------- */
@@ -1717,6 +1726,7 @@ function renderLogin(state){
     bad: 'Identifiant ou mot de passe incorrect.',
     removed: 'Ce membre ne fait plus partie du crew.',
     reset: "Ton mot de passe a changé. Utilise le nouveau (ou demande-le à l'admin du crew).",
+    kicked: "L'admin a déconnecté tout le monde. Reconnecte-toi avec ton mot de passe.",
     err: 'Connexion impossible. Vérifie ta connexion internet puis réessaie.'
   };
   const msg = state === 'wait' ? '<p>Connexion…</p>' : msgs[state] ? `<div class="banner" style="margin:0">${ic('lock')}<span>${msgs[state]}</span></div>` : '';
@@ -1742,23 +1752,33 @@ async function doLogin(){
     const old = pw.trim().toUpperCase();
     if (!k && KEY_RE.test(old)) { id = old; k = await Store.getRoot('keys/' + id); }
     if (!k) { renderLogin('bad'); return; }
-    await enterWithKey(id, k);
+    await enterWithKey(id, k, true);
   } catch(e) { console.error(e); renderLogin('err'); }
 }
-async function enterWithKey(id, k){
+async function enterWithKey(id, k, fresh){
   if (!k || k.revoked || !CODE_RE.test(k.crew || '')) { openLogin('bad'); return; }
   const md = await Store.db.doc('crews/' + k.crew + '/members/' + k.memberId).get();
   const m = md.exists ? md.data() : null;
   if (!m || m.removed) { LS.set('crew-key', null); openLogin('removed'); return; }
   if ((k.kv || 0) !== (m.kv || 0)) { LS.set('crew-key', null); openLogin('reset'); return; }
-  Store.key = id; Store.code = k.crew; S.meId = k.memberId; S.myKey = k;
+  Store.key = id; Store.code = k.crew; S.meId = k.memberId; S.myKey = k; S.freshLogin = !!fresh;
   LS.set('crew-key', id); LS.set('crew-code', k.crew);
   S.loginOpen = false; S.loginMsg = ''; renderLogin(); connect();
   toast(`Bienvenue ${m.name}.`);
 }
+// Déconnexion générale demandée par un admin (crew/config.kickAt) : tous ceux qui ne sont pas dans kickKeep
+// et qui se sont connectés avant doivent remettre leur mot de passe.
+function checkKick(c){
+  if (Store.mode !== 'fire' || !S.meId || !c || !c.kickAt) { S.freshLogin = false; return false; }
+  if (S.freshLogin) { S.freshLogin = false; LS.set('crew-kick-ok', Math.max(LS.get('crew-kick-ok', 0) || 0, c.kickAt)); return false; }
+  if ((c.kickKeep || []).includes(S.meId)) return false;
+  if (c.kickAt > (LS.get('crew-kick-ok', 0) || 0)) { logout('kicked'); return true; }
+  return false;
+}
 function logout(state){
   clearTimeout(wizSaveT); Store.stopAll();
   Store.key = null; S.meId = null; S.myKey = null; S.mdocs = []; S.vault = {}; S.vaultOn = false;
+  Object.assign(S, {identOpen:false, identSkip:false, askWritten:false, idDraft:{}, freshLogin:false});
   LS.set('crew-key', null);
   openLogin(state);
 }
@@ -2382,6 +2402,7 @@ function compressImage(file){
 // slot = "orgId|champ" : villa, boss, ou p:<idPersonne>
 async function uploadIntelImg(slot, file){
   if (!me() || !file || !/^image\//.test(file.type)) { toast('Choisis une image (photo ou capture d\'écran).'); return; }
+  if (slot === 'me|ident') return uploadIdentImg(file);
   const [orgId, field] = slot.split('|'); const o = orgById(orgId); if (!o) return;
   toast('Envoi de la photo…');
   try {
@@ -2492,7 +2513,7 @@ function openLightbox(src){ let lb = $('#lightbox'); if (!lb) { lb = document.cr
   lb.innerHTML = `<button class="btn sm lbx" data-a="lbclose">${ic('x')}Fermer</button><img src="${src}" alt="Photo agrandie">`; lb.hidden = false; }
 document.addEventListener('change', e => { const t = e.target; if (t.dataset && t.dataset.imgSlot && t.files && t.files[0]) { uploadIntelImg(t.dataset.imgSlot, t.files[0]); t.value = ''; } });
 document.addEventListener('paste', e => {
-  if (S.view !== 'renseignements' || !S.pasteSlot) return;
+  if (!S.pasteSlot || (S.view !== 'renseignements' && S.pasteSlot !== 'me|ident')) return;
   const f = Array.from((e.clipboardData || {}).items || []).map(i => i.kind === 'file' ? i.getAsFile() : null).find(x => x && /^image\//.test(x.type));
   if (!f) { toast("Le presse-papiers ne contient pas d'image."); return; }
   e.preventDefault(); const slot = S.pasteSlot; S.pasteSlot = null; uploadIntelImg(slot, f);
@@ -2501,8 +2522,158 @@ document.addEventListener('dragover', e => { const z = e.target.closest && e.tar
 document.addEventListener('drop', e => { const z = e.target.closest && e.target.closest('[data-drop-img]'); if (!z) return; e.preventDefault();
   const f = Array.from((e.dataTransfer || {}).files || []).find(x => /^image\//.test(x.type)); if (f) uploadIntelImg(z.dataset.dropImg, f); });
 
+/* ---------- Fiche RP (prénom, nom, téléphone, carte d'identité) ---------- */
+// ident/<memberId> = {first, last, phone, img (id dans intelimg), askedAt}. Demandée à la connexion tant qu'elle n'est pas complète.
+// Sans carte d'identité : rappel à l'ordre automatique après 24 h, avertissement après 3 jours (sanctions autoid-<id>-rappel/avert),
+// annulés automatiquement dès que la fiche est complète. Les admins ne reçoivent pas de sanction automatique.
+const ID_RAPPEL = 24 * 3600e3, ID_AVERT = 72 * 3600e3;
+const identOf = id => S.ident.find(x => x.id === id) || null;
+const identDone = d => !!(d && d.first && d.last && d.phone && d.img);
+const autoSxId = (mid, type) => `autoid-${mid}-${type}`;
+const autoSx = (mid, type) => S.sanctions.find(s => s.id === autoSxId(mid, type)) || null;
+const identMissing = () => members().filter(m => !identDone(identOf(m.id)));
+function identStatus(m){
+  const d = identOf(m.id);
+  if (identDone(d)) return {cls:'ok', t:'Complète'};
+  if (!d || !d.askedAt) return {cls:'wait', t:'Pas encore connecté'};
+  const av = autoSx(m.id, 'avert'), ra = autoSx(m.id, 'rappel');
+  return {cls:'fail', t: av && !av.cancelled ? 'Manquante · avertissement donné' : ra && !ra.cancelled ? 'Manquante · rappel donné' : `Manquante · demandée ${ago(d.askedAt)}`};
+}
+function writeIdent(mid, patch){
+  const m = me(); if (!m) return Promise.resolve(false);
+  const d = Object.assign({}, identOf(mid) || {}, patch, {at:Date.now(), by:m.name, byId:m.id}); delete d.id;
+  const ix = S.ident.findIndex(x => x.id === mid); const local = Object.assign({}, d, {id:mid});
+  if (ix >= 0) S.ident[ix] = local; else S.ident.push(local);
+  return Store.write('ident/' + mid, d);
+}
+async function uploadIdentImg(file){
+  const m = me(); if (!m) return;
+  toast('Envoi de la photo…');
+  try {
+    const data = await compressImage(file);
+    const id = uid('img'); imgCache[id] = data;
+    if (!(await Store.write('intelimg/' + id, {data, orgId:'', kind:'ident', memberId:m.id, at:Date.now(), by:m.name, byId:m.id}))) return;
+    await writeIdent(m.id, {img:id});
+    S.identSig = ''; renderIdent(); render();
+    toast(identDone(identOf(m.id)) ? 'Fiche RP complète. Merci !' : "Carte d'identité ajoutée. Remplis aussi ton prénom, ton nom et ton numéro.");
+    if (identDone(identOf(m.id))) { S.identOpen = false; renderIdent(); }
+    identTick();
+  } catch(e) { toast("Impossible de lire cette image."); }
+}
+function identLeftTxt(d){
+  if (!d || !d.askedAt) return '';
+  const el = Date.now() - d.askedAt;
+  const h = ms => Math.max(1, Math.ceil(ms / 3600e3));
+  if (el < ID_RAPPEL) return `Sans carte d'identité : rappel à l'ordre dans ${h(ID_RAPPEL - el)} h, avertissement dans ${h(ID_AVERT - el)} h.`;
+  if (el < ID_AVERT) return `Tu as reçu un rappel à l'ordre. Avertissement dans ${h(ID_AVERT - el)} h si ta carte d'identité n'est pas ajoutée.`;
+  return "Tu as reçu un avertissement. Ajoute ta carte d'identité pour qu'il soit retiré.";
+}
+// Fenêtre « Ta fiche RP » (dans son propre conteneur, au-dessus du reste).
+function renderIdent(){
+  let root = $('#idmodal'); if (!root) { root = document.createElement('div'); root.id = 'idmodal'; document.body.appendChild(root); }
+  const m = me();
+  if (!S.identOpen || !m || S.loginOpen) { root.innerHTML = ''; S.identSig = ''; return; }
+  const d = identOf(m.id) || {}; const dr = S.idDraft || {};
+  const img = d.img || ''; if (img) loadImg(img);
+  const sig = [m.id, img, img && imgCache[img] ? 1 : 0, S.pasteSlot, d.askedAt, d.first, d.last, d.phone].join('|');
+  if (sig === S.identSig && root.innerHTML) return; // ne pas tout redessiner pendant la saisie
+  S.identSig = sig;
+  const val = f => esc(dr[f] != null ? dr[f] : (d[f] || ''));
+  const admin = m.admin === true;
+  root.innerHTML = `<div class="ov" role="dialog" aria-modal="true" aria-label="Ta fiche RP"><div class="idm">
+    <div class="row">${ic('user')}<h3>Ta fiche RP</h3></div>
+    <p>Le crew a besoin de ton identité en jeu. Seuls le Patron, le Co-Patron et les admins du site la voient.</p>
+    <div class="row" style="gap:10px;align-items:flex-end">
+      <label class="field" style="flex:1;min-width:140px" for="idf-first">Prénom (RP)<input class="inp" id="idf-first" data-c="idf" data-f="first" maxlength="30" autocomplete="off" value="${val('first')}" placeholder="Ex. Tony"></label>
+      <label class="field" style="flex:1;min-width:140px" for="idf-last">Nom de famille (RP)<input class="inp" id="idf-last" data-c="idf" data-f="last" maxlength="30" autocomplete="off" value="${val('last')}" placeholder="Ex. Moretti"></label></div>
+    <label class="field" for="idf-phone">Numéro de téléphone (RP)<input class="inp" id="idf-phone" data-c="idf" data-f="phone" maxlength="20" inputmode="tel" autocomplete="off" value="${val('phone')}" placeholder="Ex. 555-0123"></label>
+    <div class="field">Photo de ta carte d'identité (on doit voir ta tête)</div>
+    <div style="max-width:320px">${imgSlot('me', 'ident', img, "Carte d'identité")}</div>
+    ${!admin && !identDone(d) && d.askedAt ? `<div class="banner" style="margin:0">${ic('alert')}<span>${identLeftTxt(d)}</span></div>` : ''}
+    <div class="row"><button class="btn pri" data-a="idsave">${ic('check')}Enregistrer</button><button class="btn ghost" data-a="idlater">Plus tard</button></div>
+  </div></div>`;
+}
+let identT;
+function identTick(){ clearTimeout(identT); identT = setTimeout(() => { identEnforce().catch(e => console.error(e)); }, 1200); }
+setInterval(identTick, 10 * 60e3);
+// Demande la fiche, donne / retire les sanctions automatiques. Chaque membre le fait pour lui-même ;
+// les Exécutants et plus le font aussi pour les membres qu'ils peuvent sanctionner (au cas où le membre ne se connecte plus).
+async function identEnforce(){
+  const my = me(); if (!my || !S.identLoaded || !S.sxLoaded || S.loginOpen) return;
+  const mine = identOf(my.id);
+  if (!identDone(mine)) {
+    if ((!mine || !mine.askedAt) && !S.askWritten) { S.askWritten = true; await writeIdent(my.id, {askedAt:Date.now()}); }
+    if (!S.identOpen && !S.identSkip) { S.identOpen = true; renderIdent(); }
+  }
+  const now = Date.now();
+  for (const m of members()) {
+    if (m.admin) continue;
+    const self = m.id === my.id; const d = identOf(m.id);
+    if (identDone(d)) { // fiche complète : on retire les sanctions automatiques
+      if (!(self || isExec())) continue;
+      for (const type of ['rappel', 'avert']) { const s = autoSx(m.id, type); if (!s || s.cancelled) continue;
+        s.cancelled = true; s.cancelledBy = 'Tablette (carte ajoutée)';
+        await Store.write('sanctions/' + s.id, Object.assign({}, s, {cancelled:true, cancelledBy:'Tablette (carte ajoutée)', cancelledAt:now})); }
+      continue;
+    }
+    if (!d || !d.askedAt || !(self || (isExec() && canEditMember(m)))) continue;
+    for (const [type, lim, label] of [['rappel', ID_RAPPEL, '24 h'], ['avert', ID_AVERT, '3 jours']]) {
+      if (now - d.askedAt < lim || autoSx(m.id, type)) continue;
+      const doc = {memberId:m.id, member:m.name, type, reason:`Carte d'identité RP pas ajoutée sur la tablette après ${label}`, at:now, by:'Tablette (automatique)', byId:my.id, auto:'id'};
+      S.sanctions.push(Object.assign({}, doc, {id:autoSxId(m.id, type)}));
+      await Store.write('sanctions/' + autoSxId(m.id, type), doc);
+      if (self) toast(type === 'avert' ? "Avertissement : ta carte d'identité RP n'est toujours pas sur la tablette." : "Rappel à l'ordre : ajoute ta carte d'identité RP sur la tablette.");
+    }
+  }
+  scheduleRender();
+}
+function identCopyText(){
+  const miss = identMissing();
+  return [`# 📇 Fiche RP à compléter`, '', `Détail : ${miss.map(m => m.name).join(', ') || '—'}`, '',
+    "Va sur la tablette du crew et ajoute ton prénom, ton nom, ton numéro (RP) et la photo de ta carte d'identité.",
+    "Sans ta carte : rappel à l'ordre après 24 h, avertissement après 3 jours (retirés dès que tu l'ajoutes)."].join('\n');
+}
+// Bandeaux : rappel pour le membre lui-même, liste des fiches manquantes pour le Patron, le Co-Patron et les admins.
+function identBanners(){
+  const m = me(); if (!m || !S.identLoaded) return '';
+  let out = '';
+  const d = identOf(m.id);
+  if (!identDone(d) && !S.identOpen) out += `<div class="banner" style="flex-wrap:wrap">${ic('user')}<span style="flex:1;min-width:180px"><b>Ta fiche RP n'est pas complète.</b> ${m.admin ? '' : identLeftTxt(d)}</span><button class="btn sm pri" data-a="idopen">Compléter ma fiche</button></div>`;
+  if (isBoss()) {
+    const miss = identMissing().filter(x => x.id !== m.id);
+    const today = new Date().toDateString();
+    if (miss.length && LS.get('id-banner-hide', '') !== today) out += `<div class="banner" style="flex-wrap:wrap">${ic('alert')}<span style="flex:1;min-width:180px"><b>${miss.length} membre${miss.length > 1 ? 's' : ''}</b> sans fiche RP complète : ${esc(miss.map(x => x.name).join(', '))}. Préviens-les !</span>
+      <button class="btn sm" data-a="idcopy">${ic('copy')}Copier le rappel</button><a class="btn sm" href="#membres">Voir</a><button class="btn ghost sm" data-a="idhide">Masquer aujourd'hui</button></div>`;
+  }
+  return out;
+}
+function identRow(m){
+  const d = identOf(m.id) || {}; const img = d.img || ''; if (img) loadImg(img);
+  const src = img && imgCache[img] && imgCache[img] !== 'none' ? imgCache[img] : '';
+  return `<tr class="idrow"><td colspan="8"><div class="person">
+    <div class="pimg">${src ? `<button class="imgthumb" data-a="imgview" data-id="${esc(img)}" aria-label="Agrandir la carte d'identité de ${esc(m.name)}"><img src="${src}" alt="Carte d'identité de ${esc(m.name)}"></button>` : `<div class="imgph">${img ? 'Chargement…' : "Pas de carte d'identité"}</div>`}</div>
+    <div class="pinfo"><p><b>${esc([d.first, d.last].filter(Boolean).join(' ') || 'Nom RP non renseigné')}</b></p>
+      <p>${ic('phone')} ${esc(d.phone || 'Numéro non renseigné')}</p>
+      <small>${d.at ? 'Mis à jour ' + ago(d.at) : 'Jamais rempli'}</small></div></div></td></tr>`;
+}
+
 /* ---------- Actions ---------- */
 const A = {
+  idopen(){ S.identOpen = true; S.identSig = ''; renderIdent(); render(); },
+  idlater(){ S.identOpen = false; S.identSkip = true; S.pasteSlot = null; renderIdent(); render(); },
+  idsave(){ const m = me(); if (!m) return; const v = f => (($('#idf-' + f) || {}).value || '').trim();
+    const p = {first:v('first').slice(0, 30), last:v('last').slice(0, 30), phone:v('phone').slice(0, 20)};
+    if (!p.first || !p.last || !p.phone) { toast('Remplis ton prénom, ton nom et ton numéro de téléphone (RP).'); return; }
+    if (!(identOf(m.id) || {}).askedAt) p.askedAt = Date.now();
+    writeIdent(m.id, p).then(ok => { if (!ok) return; S.idDraft = {};
+      if (identDone(identOf(m.id))) { S.identOpen = false; S.pasteSlot = null; toast('Fiche RP enregistrée. Merci !'); identTick(); }
+      else toast("Enregistré. Ajoute maintenant la photo de ta carte d'identité.");
+      S.identSig = ''; renderIdent(); render(); }); },
+  idcopy(){ copy(identCopyText(), null, 'Rappel copié. Colle-le sur Discord.'); },
+  idhide(){ LS.set('id-banner-hide', new Date().toDateString()); render(); },
+  idview(t){ S.identView = S.identView === t.dataset.id ? null : t.dataset.id; render(); },
+  kickall(){ S.confirm = null; if (!isAdmin() || Store.mode !== 'fire') { render(); return; } const at = Date.now(); LS.set('crew-kick-ok', at);
+    saveConfig({kickAt:at, kickKeep:[S.meId]}); toast('Tout le monde est déconnecté sauf toi. Chacun devra remettre son mot de passe.'); },
   logout(){ logout(); },
   login(){ doLogin(); },
   migrate(){ migrate(); },
@@ -2714,6 +2885,7 @@ document.addEventListener('input', e => {
   const t = e.target;
   if (t.dataset.c === 'invq') { S.invQ = t.value; const g = $('#inv-grid'); if (g) g.innerHTML = gridHtml(); return; }
   if (t.dataset.c === 'sxreason') { S.sxReason = t.value; return; }
+  if (t.dataset.c === 'idf') { S.idDraft[t.dataset.f] = t.value; return; }
   if (t.dataset.c === 'oe' && S.oe && ['total', 'targetOrg'].includes(t.dataset.f)) { S.oe[t.dataset.f] = t.value; return; }
   if (t.dataset.c === 'logq') { S.logQ = t.value; render(); const i = $('#log-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } return; }
   if (t.dataset.c === 'tgt' && S.wiz) { S.wiz.targetOrg = t.value; saveWiz(); const d = $('#disc'); if (d) d.textContent = discordText(opFromWiz(S.wiz)); return; }
@@ -2780,9 +2952,9 @@ route();
 let slowT;
 function connect(){
   Store.stopAll();
-  Object.assign(S, {config:null, cfgLoaded:false, ops:[], live:[], coffre:[], forms:[], mdocs:[], vault:{}, vaultOn:false, sanctions:[], inv:[], invlog:[], labs:[], intel:[], syncErr:false, slow:false, v3:undefined, logs:[], logsOn:false, logsLoaded:false, logsUnsub:null, meta:null});
+  Object.assign(S, {config:null, cfgLoaded:false, ops:[], live:[], coffre:[], forms:[], mdocs:[], vault:{}, vaultOn:false, sanctions:[], inv:[], invlog:[], labs:[], intel:[], ident:[], identLoaded:false, sxLoaded:false, syncErr:false, slow:false, v3:undefined, logs:[], logsOn:false, logsLoaded:false, logsUnsub:null, meta:null});
   clearTimeout(slowT); slowT = setTimeout(() => { if (!Store.synced) { S.slow = true; renderSync(); } }, 10000);
-  Store.watchDoc('crew/config', d => { S.config = d; S.cfgLoaded = true; scheduleRender(); });
+  Store.watchDoc('crew/config', d => { S.config = d; S.cfgLoaded = true; if (checkKick(d)) return; scheduleRender(); });
   Store.watchDoc('crew/v3', d => { S.v3 = !!d; checkSec(); });
   Store.watchDoc('crew/meta', d => { S.meta = d; scheduleRender(); });
   Store.watchColl('members', l => { S.mdocs = l;
@@ -2797,7 +2969,8 @@ function connect(){
   Store.watchColl('live', l => { S.live = l; scheduleRender(); });
   Store.watchColl('coffre', l => { S.coffre = l; scheduleRender(); });
   Store.watchColl('formations', l => { S.forms = l; scheduleRender(); });
-  Store.watchColl('sanctions', l => { S.sanctions = l; scheduleRender(); });
+  Store.watchColl('sanctions', l => { S.sanctions = l; S.sxLoaded = true; identTick(); scheduleRender(); });
+  Store.watchColl('ident', l => { S.ident = l; S.identLoaded = true; identTick(); scheduleRender(); });
   Store.watchColl('inv', l => { S.inv = l; scheduleRender(); });
   Store.watchColl('labs', l => { S.labs = l; scheduleRender(); });
   Store.watchColl('intel', l => { S.intel = l; scheduleRender(); });

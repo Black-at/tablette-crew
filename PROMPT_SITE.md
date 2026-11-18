@@ -177,6 +177,13 @@ Postes :
 - Panneaux : « Mes formations » (barre Demande → Session → Formé), « À former » pour les formateurs, « Meilleurs formateurs », « Désigner les formateurs » (Patron, Co-Patron, admin), et un tableau membres × formations que les Exécutants peuvent forcer.
 - Les badges de formation servent aux boutons Auto des missions.
 
+### Fiche RP (identité en jeu)
+- À la connexion, tant qu'elle n'est pas complète, une fenêtre demande : **prénom et nom (RP)**, **numéro de téléphone (RP)** et la **photo de la carte d'identité** (fichier, glisser-déposer ou Ctrl+V). « Plus tard » la ferme jusqu'au prochain chargement ; un bandeau reste affiché.
+- `askedAt` = première demande. Sans carte d'identité : **rappel à l'ordre automatique après 24 h**, **avertissement automatique après 3 jours** (sanctions `autoid-<id>-rappel` / `autoid-<id>-avert`, `auto: 'id'`, par « Tablette (automatique) »). Dès que la fiche est complète, elles sont **annulées automatiquement**. Les admins n'en reçoivent pas. L'avertissement automatique ne vire pas tout seul.
+- Ces sanctions sont posées par le membre lui-même (règle `auto == 'id'`) ou par un Exécutant et plus connecté.
+- Patron, Co-Patron et admins : colonne « Fiche RP » dans Membres (statut + « Voir » : nom RP, téléphone, carte d'identité agrandissable) et bandeau « X membres sans fiche RP » avec « Copier le rappel » pour Discord.
+- Chacun voit et modifie sa fiche dans Paramètres → Mon profil.
+
 ### Membres
 - Tableau par grade : grade (modifiable selon les droits), formations, nombre d'OP, nombre de fois tiré à la roue, avertissements (x/2), bouton pour virer avec confirmation.
 - Ajout de membres (Patron, Co-Patron, admin).
@@ -192,6 +199,7 @@ Postes :
 - Rappel de qui peut faire quoi.
 
 ### Codes d'accès (admin seulement)
+- **Déconnecter tout le monde** (sauf l'admin qui clique) : écrit `kickAt` et `kickKeep` dans `crew/config` ; chacun doit remettre son mot de passe (inchangé).
 - Pour chaque membre : son mot de passe de départ (masqué, avec « Afficher »), le bouton **Copier** (message prêt à envoyer en privé : lien `#id=Nom`, identifiant, mot de passe), **Réinitialiser**, et « Créer les mots de passe manquants ».
 - La mention « Changé par le membre » s'affiche quand il l'a modifié.
 
@@ -220,7 +228,8 @@ Paies.
 | `formations/<memberId>__<formation>` | `status (inscrit, accepte, forme, none), wantId, trainerId, trainer, session, refusals[], validatedBy, history[]` |
 | `sanctions/<id>` | `memberId, member, type (rappel, avert), reason, by, byId, cancelled` |
 | `intel/<id>` | fiches de renseignement (`name, color, colorHex, claims, radio, threat, villa{desc, imgId}, boss{name, notes, imgId}, people[], notes[], log[], lastById`) |
-| `intelimg/<id>` | `{data: dataURL JPEG, orgId, byId}` |
+| `intelimg/<id>` | `{data: dataURL JPEG, orgId, byId}` (+ `kind: 'ident', memberId` pour les cartes d'identité) |
+| `ident/<memberId>` | fiche RP : `first, last, phone, img, askedAt, at, by, byId` |
 | `logs/<id de preuve>` | journal des modifications (lu par la page Logs des admins) |
 | `proofs/<id>` | preuves d'écriture (illisibles) |
 | `v/<secret>/codes/<memberId>` | mots de passe de départ (admin) |
