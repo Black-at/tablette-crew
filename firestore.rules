@@ -12,7 +12,7 @@ rules_version = '2';
 // Droits selon le grade (crews/<crew>/members/<id>) :
 //   Admin du site : tout, y compris les codes et le journal (sauf modifier le fondateur).  Patron / Co-Patron : tout sauf les codes.
 //   Exécutant : OP, roue, formations, sanctions, grade et renvoi des Membres/Lieutenants, objets du coffre.
-//   Lieutenant / Membre : lecture, s'inscrire à une formation, cocher la roue à son tour,
+//   Lieutenant / Membre : lecture, lancer les missions ouvertes (supérette, ATM, conteneur), s'inscrire à une formation, cocher la roue à son tour,
 //   déposer/retirer dans le coffre, changer son mot de passe.
 // Rien n'est jamais supprimé définitivement.
 service cloud.firestore {
@@ -114,6 +114,17 @@ service cloud.firestore {
       let d = request.resource.data;
       return L >= 1 && d.lastById == myId(c) && (d.get('_del', false) == false || L >= 2);
     }
+    // Missions ouvertes : tout membre peut les lancer (même liste que open:true dans index.html).
+    function openMission(id) { return id in ['superette', 'atm', 'conteneur']; }
+    function opsCreate(c) {
+      let L = lvl(c);
+      return L >= 2 || (L >= 1 && openMission(request.resource.data.get('missionId', '')));
+    }
+    function liveWrite(c) {
+      let L = lvl(c);
+      return L >= 2 || (L >= 1 && openMission(request.resource.data.get('missionId', ''))
+        && (resource == null || openMission(resource.data.get('missionId', ''))));
+    }
     function vaultWrite(c, vs) {
       let L = lvl(c);
       return L == 4 && (kdoc(c).get('vault', '') == vs || !exists(/databases/$(database)/documents/crews/$(c)/crew/v3));
@@ -169,13 +180,13 @@ service cloud.firestore {
 
       match /ops/{id} {
         allow read: if okCode(c);
-        allow create: if boot(c) || lvl(c) >= 2;
+        allow create: if boot(c) || opsCreate(c);
         allow update: if boot(c) || lvl(c) >= 3 || (lvl(c) == 2 && request.resource.data.get('_del', false) == false);
         allow delete: if false;
       }
       match /live/{id} {
         allow read: if okCode(c);
-        allow create, update: if boot(c) || lvl(c) >= 2;
+        allow create, update: if boot(c) || liveWrite(c);
         allow delete: if false;
       }
       match /coffre/{w} {
