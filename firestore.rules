@@ -11,8 +11,8 @@ rules_version = '2';
 //
 // Droits selon le grade (crews/<crew>/members/<id>) :
 //   Admin du site : tout, y compris les codes et le journal (sauf modifier le fondateur).  Patron / Co-Patron : tout sauf les codes.
-//   Exécutant : OP, roue, formations, sanctions, grade et renvoi des Membres/Lieutenants, objets du coffre.
-//   Lieutenant / Membre : lecture, lancer les missions ouvertes (supérette, ATM, conteneur), remplir sa fiche RP, s'inscrire à une formation, cocher la roue à son tour,
+//   Bras droit / Exécutant : OP, roue, formations, sanctions, grade et renvoi des Lieutenants/Membres/Recrues, objets du coffre.
+//   Lieutenant / Membre / Recrue : lecture, lancer les missions ouvertes (supérette, ATM, conteneur), remplir sa fiche RP, s'inscrire à une formation, cocher la roue à son tour,
 //   déposer/retirer dans le coffre, changer son mot de passe.
 // Rien n'est jamais supprimé définitivement.
 service cloud.firestore {
@@ -41,10 +41,10 @@ service cloud.firestore {
     function kdoc(c) { return get(keyPath(getAfter(proofPath(c)).data.k)).data; }
     function myId(c) { return kdoc(c).memberId; }
 
-    // Niveau de l'auteur : 0 = aucun droit, 1 = Membre/Lieutenant, 2 = Exécutant, 3 = Patron/Co-Patron, 4 = admin.
+    // Niveau de l'auteur : 0 = aucun droit, 1 = Recrue/Membre/Lieutenant, 2 = Exécutant/Bras droit, 3 = Patron/Co-Patron, 4 = admin.
     function lvlOf(m) {
       return m.get('admin', false) == true ? 4
-        : (m.grade in ['Patron', 'Co-Patron'] ? 3 : (m.grade == 'Exécutant' ? 2 : 1));
+        : (m.grade in ['Patron', 'Co-Patron'] ? 3 : (m.grade in ['Exécutant', 'Bras droit'] ? 2 : 1));
     }
     function lvl(c) {
       let ok = hasProof(c) && existsAfter(logPath(c)) && exists(keyPath(getAfter(proofPath(c)).data.k));
@@ -56,7 +56,7 @@ service cloud.firestore {
     function canTarget(L, t) {
       return L == 4
         || (L == 3 && t.get('admin', false) == false)
-        || (L == 2 && t.get('admin', false) == false && t.grade in ['Membre', 'Lieutenant']);
+        || (L == 2 && t.get('admin', false) == false && t.grade in ['Membre', 'Lieutenant', 'Recrue']);
     }
 
     // Création d'une clé : par l'admin, ou par un membre pour lui-même (changement de mot de passe).
@@ -72,7 +72,7 @@ service cloud.firestore {
       let d = request.resource.data;
       return (L == 4 && (mid != founder(c) || mid == myId(c)))
         || (L == 3 && resource.data.get('admin', false) == false && onlyKeys(['grade', 'removed', 'name', '_p', '_k']))
-        || (L == 2 && canTarget(L, resource.data) && d.grade in ['Membre', 'Lieutenant'] && onlyKeys(['grade', 'removed', '_p', '_k']))
+        || (L == 2 && canTarget(L, resource.data) && d.grade in ['Membre', 'Lieutenant', 'Recrue'] && onlyKeys(['grade', 'removed', '_p', '_k']))
         || (L >= 1 && mid == myId(c) && onlyKeys(['kv', 'pwChanged', '_p', '_k']) && d.get('kv', 0) == resource.data.get('kv', 0) + 1);
     }
     // Sanction : par un Exécutant et plus, ou sanction automatique (fiche RP sans carte d'identité)

@@ -12,7 +12,7 @@ Il remplace ce que le crew faisait à la main sur Discord : les messages du salo
 
 - Langue de l'interface : **français** (tutoiement, ton simple et direct).
 - Utilisateurs : une quinzaine de joueurs, sur PC et sur téléphone.
-- Hiérarchie du crew : **Patron → Co-Patron → Exécutant (élite) → Lieutenant → Membre**.
+- Hiérarchie du crew : **Patron → Co-Patron → Bras droit → Exécutant (élite) → Lieutenant → Membre → Recrue**.
 - L'admin du site est **« Le R »** (grade Exécutant + drapeau `admin`).
 
 ---
@@ -86,12 +86,12 @@ Il n'y a **pas de Firebase Auth**. Le système est maison :
 12. Champs hérités à tolérer : `_k` (ancien code de l'auteur, retiré à chaque réécriture).
 
 ### Droits par grade (appliqués dans les règles Firestore et dans l'interface)
-Les règles calculent un niveau : 0 = aucun, 1 = Membre/Lieutenant, 2 = Exécutant, 3 = Patron/Co-Patron, 4 = admin.
+Les règles calculent un niveau : 0 = aucun, 1 = Recrue/Membre/Lieutenant, 2 = Exécutant/Bras droit, 3 = Patron/Co-Patron, 4 = admin.
 
 | Niveau | Peut faire |
 |---|---|
-| Membre / Lieutenant | Consulter ; s'inscrire à une formation ; cocher la roue du coffre quand c'est son tour ; déposer et retirer dans les coffres ; enregistrer récoltes et ventes ; compléter les fiches de renseignement ; changer son mot de passe |
-| Exécutant (élite) | En plus : lancer les OP, tirer la roue, gérer les formations, **sanctionner, changer le grade (Lieutenant ↔ Membre) et virer les Lieutenants et Membres**, gérer les objets du coffre, corriger ou supprimer récoltes et ventes, supprimer une fiche de renseignement |
+| Recrue / Membre / Lieutenant | Consulter ; s'inscrire à une formation ; cocher la roue du coffre quand c'est son tour ; déposer et retirer dans les coffres ; enregistrer récoltes et ventes ; compléter les fiches de renseignement ; changer son mot de passe |
+| Exécutant (élite), Bras droit | En plus : lancer les OP, tirer la roue, gérer les formations, **sanctionner, changer le grade (Lieutenant / Membre / Recrue) et virer les Lieutenants, Membres et Recrues** ; le Bras droit voit aussi les fiches RP, gérer les objets du coffre, corriger ou supprimer récoltes et ventes, supprimer une fiche de renseignement |
 | Patron / Co-Patron | Tout sauf les codes d'accès : ajouter des membres, tous les grades, paramètres, annuler une sanction, supprimer un bilan, désigner les formateurs |
 | Admin | Tout, y compris les codes d'accès, la réinitialisation des mots de passe, les **Logs** et la nomination d'autres admins (le fondateur reste protégé) |
 

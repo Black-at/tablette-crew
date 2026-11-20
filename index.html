@@ -23,7 +23,7 @@
   --danger:#e5484d; --danger-soft:rgba(229,72,77,.13);
   --ok:#3fb950; --ok-soft:rgba(63,185,80,.14); --warn:#e3b341; --warn-soft:rgba(227,179,65,.14);
   --p-neg:#a78bfa; --p-sur:#e3b341; --p-braq:#f0625f; --p-poly:#3fc1a6; --p-cond:#f472b6;
-  --g-patron:#e3b341; --g-copatron:#f0883e; --g-exec:#5bb3f5; --g-lieut:#3fc1a6; --g-membre:#9aa0aa;
+  --g-patron:#e3b341; --g-copatron:#f0883e; --g-bras:#d2a8ff; --g-exec:#5bb3f5; --g-lieut:#3fc1a6; --g-membre:#9aa0aa; --g-recrue:#6b7079;
   --font:"Poppins",ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
 }
 *{box-sizing:border-box}
@@ -608,11 +608,14 @@ const liveEnd = (id, w) => Store.write('live/' + id, {_del:true, missionId:(w &&
 // 'none' aucun (attaques du crew). Le total n'apparaît dans le message Discord que s'il est rempli.
 const payMode = mi => !mi || !mi.crew ? 'opt' : mi.money ? 'opt' : 'none';
 
-const GRADES = ['Patron','Co-Patron','Exécutant','Lieutenant','Membre'];
-const GCOL = {'Patron':'var(--g-patron)','Co-Patron':'var(--g-copatron)','Exécutant':'var(--g-exec)','Lieutenant':'var(--g-lieut)','Membre':'var(--g-membre)'};
+// Hiérarchie du serveur : Patron (6) > Co-Patron (5) > Bras droit (4) > Exécutant (3) > Lieutenant (2) > Membre (1) > Recrue (0).
+const GRADES = ['Patron','Co-Patron','Bras droit','Exécutant','Lieutenant','Membre','Recrue'];
+const GCOL = {'Patron':'var(--g-patron)','Co-Patron':'var(--g-copatron)','Bras droit':'var(--g-bras)','Exécutant':'var(--g-exec)','Lieutenant':'var(--g-lieut)','Membre':'var(--g-membre)','Recrue':'var(--g-recrue)'};
 const GLABEL = {'Exécutant':'Exécutant (élite)'};
-const LEADS = ['Patron','Co-Patron','Exécutant','Lieutenant'];
-const MANAGERS = ['Patron','Co-Patron','Exécutant'];
+const LEADS = ['Patron','Co-Patron','Bras droit','Exécutant','Lieutenant'];
+const MANAGERS = ['Patron','Co-Patron','Bras droit','Exécutant'];
+// Grades qu'un Exécutant / Bras droit peut gérer (grade, sanction, renvoi).
+const LOW_GRADES = ['Lieutenant','Membre','Recrue'];
 
 const POSTES = [
   {id:'neg',  name:'Négociateur',          short:'Négociateur', emoji:'🗣️', col:'var(--p-neg)',  form:'nego'},
@@ -896,12 +899,15 @@ const members = () => S.mdocs.filter(m => !m.removed);
 const me = () => S.mdocs.find(m => m.id === S.meId && !m.removed) || null;
 const isAdmin = () => { const m = me(); return !!m && m.admin === true; };
 const isBoss = () => { const m = me(); return !!m && (['Patron','Co-Patron'].includes(m.grade) || m.admin === true); };
-const isExec = () => { const m = me(); return !!m && (['Patron','Co-Patron','Exécutant'].includes(m.grade) || m.admin === true); };
+const isExec = () => { const m = me(); return !!m && (MANAGERS.includes(m.grade) || m.admin === true); };
+// Fiches RP : Patron, Co-Patron, admins, et le Bras droit (au-dessus des Exécutants).
+const enTantQue = g => /^[AEIOUÉÈ]/i.test(g) ? `qu'${g}` : `que ${g}`;
+const canSeeIdent = () => isBoss() || (!!me() && me().grade === 'Bras droit');
 const isLead = isExec;
 const canManage = isBoss;
 // Peut modifier le grade / renvoyer ce membre ?
-const canEditMember = m => !!m && m.id !== S.meId && !(S.meta && S.meta.admin === m.id) && (isAdmin() || (isBoss() && !m.admin) || (isExec() && !m.admin && ['Membre','Lieutenant'].includes(m.grade)));
-const gradeChoices = () => isBoss() ? GRADES : ['Lieutenant','Membre'];
+const canEditMember = m => !!m && m.id !== S.meId && !(S.meta && S.meta.admin === m.id) && (isAdmin() || (isBoss() && !m.admin) || (isExec() && !m.admin && LOW_GRADES.includes(m.grade)));
+const gradeChoices = () => isBoss() ? GRADES : LOW_GRADES;
 const byName = n => members().find(m => m.name === n);
 const formState = (mid, fid) => { const d = S.forms.find(f => f.id === `${mid}__${fid}`); return d && d.status !== 'none' ? d.status : null; };
 const isFormed = (name, fid) => { const m = byName(name); return !!m && formState(m.id, fid) === 'forme'; };
@@ -1518,27 +1524,27 @@ VIEWS.formations = () => {
 
 /* ---------- Membres ---------- */
 VIEWS.membres = () => {
-  const ms = members(); const boss = isBoss(); const exec = isExec();
+  const ms = members(); const boss = isBoss(); const exec = isExec(); const seeId = canSeeIdent();
   const opsCount = n => S.ops.filter(o => (o.participants||[]).some(p => p.name === n)).length;
   const coffreCount = id => S.coffre.filter(c => c.memberId === id).length;
   const rows = GRADES.flatMap(g => ms.filter(m => m.grade === g)).map(m => {
     const k = 'mdel:' + m.id; const can = canEditMember(m);
     const choices = gradeChoices();
-    return `<tr><td><b>${esc(m.name)}</b>${boss && identOf(m.id) && identOf(m.id).first ? `<br><small style="color:var(--muted)">${esc(identOf(m.id).first + ' ' + (identOf(m.id).last || ''))}</small>` : ''}${m.id === S.meId ? ' <span class="st-pill info">toi</span>' : ''}${m.admin ? ' <span class="st-pill wait">admin</span>' : ''}</td>
+    return `<tr><td><b>${esc(m.name)}</b>${seeId && identOf(m.id) && identOf(m.id).first ? `<br><small style="color:var(--muted)">${esc(identOf(m.id).first + ' ' + (identOf(m.id).last || ''))}</small>` : ''}${m.id === S.meId ? ' <span class="st-pill info">toi</span>' : ''}${m.admin ? ' <span class="st-pill wait">admin</span>' : ''}</td>
       <td>${can ? `<select class="inp" data-c="mgrade" data-id="${esc(m.id)}" id="g-${esc(m.id)}" aria-label="Grade de ${esc(m.name)}">${choices.map(g => `<option ${g===m.grade?'selected':''} value="${g}">${GLABEL[g]||g}</option>`).join('')}</select>` : `<span class="grade" style="--gc:${GCOL[m.grade]}">${esc(GLABEL[m.grade]||m.grade)}</span>`}</td>
       <td>${fBadges(m.name) || '<span style="color:var(--dim)">—</span>'}</td>
       <td class="num">${opsCount(m.name)}</td><td class="num">${coffreCount(m.id)}</td><td class="num" style="color:${warnCount(m.id) ? 'var(--danger)' : 'var(--dim)'}">${warnCount(m.id)}/2</td>
-      ${boss ? (() => { const st = identStatus(m); return `<td style="white-space:nowrap"><span class="st-pill ${st.cls}">${esc(st.t)}</span></td>`; })() : ''}
+      ${seeId ? (() => { const st = identStatus(m); return `<td style="white-space:nowrap"><span class="st-pill ${st.cls}">${esc(st.t)}</span></td>`; })() : ''}
       <td style="text-align:right;white-space:nowrap">${can ? (S.confirm === k ? `<button class="btn red sm" data-a="mdel" data-id="${esc(m.id)}">Virer du crew</button> <button class="btn sm" data-a="noconfirm">Annuler</button>` : `<button class="btn ghost sm" data-a="askconfirm" data-k="${k}" aria-label="Virer ${esc(m.name)}">${ic('trash')}</button>`) : ''}</td></tr>`;
   }).join('');
   const counts = GRADES.map(g => { const n = ms.filter(m => m.grade === g).length; return n ? `<span class="pc" style="--pc:${GCOL[g]}">${GLABEL[g]||g} <b class="num">${n}</b></span>` : ''; }).join('');
-  const who = boss ? '' : exec ? `<div class="banner">${ic('info')}En tant qu'Exécutant, tu peux passer un membre Lieutenant ou Membre, et virer les Lieutenants et Membres.</div>`
+  const who = boss ? '' : exec ? `<div class="banner">${ic('info')}En tant ${esc(enTantQue(me().grade))}, tu peux passer un membre Lieutenant, Membre ou Recrue, et virer les Lieutenants, Membres et Recrues.</div>`
     : `<div class="banner">${ic('lock')}Seuls les Exécutants et plus peuvent modifier les membres.</div>`;
-  return `${who}${boss ? `<div class="toolbar" style="margin-bottom:14px"><button class="btn pri" data-a="rpopen">${ic('user')}Panel fiche RP</button><span class="lbl">${identMissing().length ? `${identMissing().length} fiche${identMissing().length > 1 ? 's' : ''} manquante${identMissing().length > 1 ? 's' : ''}` : 'Toutes les fiches sont complètes'}</span></div>` : ''}${boss ? `<div class="toolbar" style="margin-bottom:14px"><input class="inp" id="madd-name" placeholder="Nom du nouveau membre" maxlength="30" style="flex:1;min-width:140px;max-width:280px">
+  return `${who}${seeId ? `<div class="toolbar" style="margin-bottom:14px"><button class="btn pri" data-a="rpopen">${ic('user')}Panel fiche RP</button><span class="lbl">${identMissing().length ? `${identMissing().length} fiche${identMissing().length > 1 ? 's' : ''} manquante${identMissing().length > 1 ? 's' : ''}` : 'Toutes les fiches sont complètes'}</span></div>` : ''}${boss ? `<div class="toolbar" style="margin-bottom:14px"><input class="inp" id="madd-name" placeholder="Nom du nouveau membre" maxlength="30" style="flex:1;min-width:140px;max-width:280px">
       <select class="inp" id="madd-grade" aria-label="Grade">${GRADES.map(g => `<option value="${g}" ${g==='Membre'?'selected':''}>${GLABEL[g]||g}</option>`).join('')}</select>
       <button class="btn pri" data-a="madd">${ic('plus')}Ajouter au crew</button></div>` : ''}
     ${ms.length ? `<div class="chips" style="margin-bottom:12px">${counts}</div>
-      <div class="panel"><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Grade</th><th>Formations</th><th>OP</th><th>Coffre</th><th>Avert.</th>${boss ? '<th>Fiche RP</th>' : ''}<th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`
+      <div class="panel"><div class="tbl-wrap"><table><thead><tr><th>Nom</th><th>Grade</th><th>Formations</th><th>OP</th><th>Coffre</th><th>Avert.</th>${seeId ? '<th>Fiche RP</th>' : ''}<th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`
       : `<div class="empty"><strong>Chargement des membres…</strong></div>`}`;
 };
 
@@ -1568,8 +1574,8 @@ VIEWS.parametres = () => {
           <input class="inp" id="pw-new2" type="password" autocomplete="new-password" placeholder="Confirme le nouveau mot de passe" aria-label="Confirmer le nouveau mot de passe">
           <div class="row"><button class="btn pri sm" id="pw-btn" data-a="chpw">Changer mon mot de passe</button></div></div>` : ''}</div>
       <div class="panel"><h3>Qui peut faire quoi</h3><ul class="prog" style="--pc:var(--accent-hi)">
-        <li>${ic('check')}<span><b>Membre, Lieutenant</b> : consulter, s'inscrire à une formation, déposer et retirer dans le coffre, cocher la roue quand c'est son tour.</span></li>
-        <li>${ic('check')}<span><b>Exécutant (élite)</b> : lancer les OP, tirer la roue, valider les formations, sanctionner les Lieutenants et Membres, gérer les objets du coffre, passer un membre Lieutenant ou Membre, virer un Lieutenant ou un Membre.</span></li>
+        <li>${ic('check')}<span><b>Recrue, Membre, Lieutenant</b> : consulter, lancer la supérette, l'ATM et le conteneur, s'inscrire à une formation, déposer et retirer dans le coffre, cocher la roue quand c'est son tour.</span></li>
+        <li>${ic('check')}<span><b>Exécutant (élite), Bras droit</b> : lancer les OP, tirer la roue, valider les formations, gérer les objets du coffre, sanctionner, changer le grade (Lieutenant, Membre, Recrue) et virer les Lieutenants, Membres et Recrues. Le Bras droit voit aussi les fiches RP.</span></li>
         <li>${ic('check')}<span><b>Patron, Co-Patron</b> : tout, sauf les mots de passe (ajouter des membres, tous les grades, paramètres, supprimer un bilan).</span></li>
         <li>${ic('check')}<span><b>Admin du site</b> : tout, y compris créer et réinitialiser les mots de passe.</span></li>
       </ul></div>
@@ -1901,7 +1907,7 @@ VIEWS.sanctions = () => {
   if (!targets.some(m => m.id === S.sxMember)) S.sxMember = targets[0] ? targets[0].id : '';
   const tgt = S.mdocs.find(m => m.id === S.sxMember);
   const willKick = tgt && S.sxType === 'avert' && warnCount(tgt.id) >= 1;
-  const form = exec ? `<div class="panel"><h3>Sanctionner</h3><p class="hint">${boss ? 'Tu peux sanctionner tous les membres sauf l\'admin.' : 'En tant qu\'Exécutant, tu peux sanctionner les Lieutenants et les Membres.'}</p>
+  const form = exec ? `<div class="panel"><h3>Sanctionner</h3><p class="hint">${boss ? 'Tu peux sanctionner tous les membres sauf l\'admin.' : `En tant ${esc(enTantQue(me().grade))}, tu peux sanctionner les Lieutenants, les Membres et les Recrues.`}</p>
       ${targets.length ? `<div class="stack" style="gap:12px">
         <div class="row" style="align-items:flex-end">
           <label class="field" for="sx-member" style="flex:1;min-width:160px">Membre<select class="inp" id="sx-member" data-c="sxmember">${targets.map(m => `<option value="${esc(m.id)}" ${m.id===S.sxMember?'selected':''}>${esc(m.name)} · ${esc(m.grade)} · ${warnCount(m.id)}/2 avert.</option>`).join('')}</select></label>
@@ -2594,7 +2600,7 @@ function renderIdent(){
   const admin = m.admin === true;
   root.innerHTML = `<div class="ov" role="dialog" aria-modal="true" aria-label="Ta fiche RP"><div class="idm">
     <div class="row">${ic('user')}<h3>Ta fiche RP</h3></div>
-    <p>Le crew a besoin de ton identité en jeu. Seuls le Patron, le Co-Patron et les admins du site la voient.</p>
+    <p>Le crew a besoin de ton identité en jeu. Seuls le Patron, le Co-Patron, le Bras droit et les admins du site la voient.</p>
     <div class="row" style="gap:10px;align-items:flex-end">
       <label class="field" style="flex:1;min-width:140px" for="idf-first">Prénom (RP)<input class="inp" id="idf-first" data-c="idf" data-f="first" maxlength="30" autocomplete="off" value="${val('first')}" placeholder="Ex. Tony"></label>
       <label class="field" style="flex:1;min-width:140px" for="idf-last">Nom de famille (RP)<input class="inp" id="idf-last" data-c="idf" data-f="last" maxlength="30" autocomplete="off" value="${val('last')}" placeholder="Ex. Moretti"></label></div>
@@ -2651,7 +2657,7 @@ function identBanners(){
   let out = '';
   const d = identOf(m.id);
   if (!identDone(d) && !S.identOpen) out += `<div class="banner" style="flex-wrap:wrap">${ic('user')}<span style="flex:1;min-width:180px"><b>Ta fiche RP n'est pas complète.</b> ${m.admin ? '' : identLeftTxt(d)}</span><button class="btn sm pri" data-a="idopen">Compléter ma fiche</button></div>`;
-  if (isBoss()) {
+  if (canSeeIdent()) {
     const miss = identMissing().filter(x => x.id !== m.id);
     const today = new Date().toDateString();
     if (miss.length && LS.get('id-banner-hide', '') !== today) out += `<div class="banner" style="flex-wrap:wrap">${ic('alert')}<span style="flex:1;min-width:180px"><b>${miss.length} membre${miss.length > 1 ? 's' : ''}</b> sans fiche RP complète : ${esc(miss.map(x => x.name).join(', '))}. Préviens-les !</span>
@@ -2689,7 +2695,7 @@ function rpGridHtml(){
 }
 function renderRpPanel(full){
   let root = $('#rppanel'); if (!root) { root = document.createElement('div'); root.id = 'rppanel'; document.body.appendChild(root); }
-  if (!S.rpOpen || !isBoss() || S.loginOpen) { root.innerHTML = ''; return; }
+  if (!S.rpOpen || !canSeeIdent() || S.loginOpen) { root.innerHTML = ''; return; }
   const grid = root.querySelector('#rp-grid');
   if (grid && !full) { grid.innerHTML = rpGridHtml(); return; } // garde le focus de la recherche
   const all = members(); const ok = all.filter(m => identDone(identOf(m.id))).length;
@@ -2723,7 +2729,7 @@ const A = {
       S.identSig = ''; renderIdent(); render(); }); },
   idcopy(){ copy(identCopyText(), null, 'Rappel copié. Colle-le sur Discord.'); },
   idhide(){ LS.set('id-banner-hide', new Date().toDateString()); render(); },
-  rpopen(){ if (!isBoss()) return; S.rpOpen = true; S.confirm = null; renderRpPanel(true); },
+  rpopen(){ if (!canSeeIdent()) return; S.rpOpen = true; S.confirm = null; renderRpPanel(true); },
   rpclose(){ S.rpOpen = false; S.confirm = null; renderRpPanel(true); render(); },
   rpfilter(t){ S.rpFilter = t.dataset.f; renderRpPanel(true); },
   rpreset(t){ S.confirm = null; const m = S.mdocs.find(x => x.id === t.dataset.id); if (!isAdmin() || !m) { render(); return; }

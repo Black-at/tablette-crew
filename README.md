@@ -33,8 +33,8 @@ Pas besoin d'activer quoi que ce soit dans Firebase : il suffit de publier les r
 ## Droits
 | Grade | Peut faire |
 |---|---|
-| Membre, Lieutenant | Consulter, s'inscrire à une formation, déposer/retirer dans le coffre, cocher la roue quand c'est son tour, changer son mot de passe |
-| Exécutant (élite) | Lancer les OP, tirer la roue, valider les formations, sanctionner et gérer les Lieutenants/Membres, gérer les objets du coffre |
+| Recrue, Membre, Lieutenant | Consulter, s'inscrire à une formation, déposer/retirer dans le coffre, cocher la roue quand c'est son tour, changer son mot de passe |
+| Exécutant (élite), Bras droit | Lancer les OP, tirer la roue, valider les formations, sanctionner et gérer les Lieutenants/Membres/Recrues, gérer les objets du coffre |
 | Patron, Co-Patron | Tout sauf les comptes : ajouter des membres, tous les grades, paramètres, annuler une sanction, supprimer un bilan |
 | Admin du site | Tout, y compris les comptes |
 
