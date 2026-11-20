@@ -581,23 +581,24 @@ const MISSIONS = [
   {id:'po-orga',    name:'PO sur Orga', min:2, max:15, dur:30, lvl:0, hue:350, art:'po', crew:true, emoji:'🎯', intel:true, money:true},
   // Récolte aux points chauds : ouvre l'assistant du labo (chacun note ce qu'il a récolté), le total part dans le stock à vendre.
   {id:'hotspot',    name:'Récolte points chauds', min:1, max:23, dur:30, lvl:0, hue:105, art:'leaf', crew:true, emoji:'🌿', lab:'hotspot'},
-  // open:true = tout membre peut lancer la mission (liste OPEN_MISSIONS aussi dans firestore.rules). Plus aucun temps de recharge.
-  {id:'superette',name:'Braquage de supérette', min:1, max:4,  xp:800,   dur:15, lvl:1,  hue:55,  art:'shop', open:true},
+  // open:true = tout membre peut lancer la mission (liste openMission aussi dans firestore.rules).
+  // cd = délai en heures avant de pouvoir relancer la mission, compté à partir du LANCEMENT (0.75 = 45 min).
+  {id:'superette',name:'Braquage de supérette', min:1, max:4,  xp:800,   dur:15, lvl:1,  cd:1, hue:55,  art:'shop', open:true},
   {id:'atm',      name:'Mission ATM',           min:1, max:4,  xp:1200,  dur:20, lvl:1,  hue:180, art:'atm', open:true},
-  {id:'gruppe6',  name:'Gruppe6',               min:2, max:7,  xp:2500,  dur:30, lvl:1,  hue:140, art:'truck'},
-  {id:'bateau',   name:'Bateau de trafiquant',  min:4, max:7,  xp:1500,  dur:30, lvl:3,  hue:205, art:'ship'},
-  {id:'conteneur',name:'Mission conteneur',     min:3, max:8,  xp:4000,  dur:30, lvl:4,  hue:230, art:'container', open:true},
-  {id:'flecca',   name:'Flecca Banque',         min:4, max:10, xp:3500,  dur:30, lvl:5,  hue:150, art:'bank'},
-  {id:'pine',     name:'Pine Banque',           min:4, max:15, xp:5000,  dur:30, lvl:7,  hue:28,  art:'bank'},
-  {id:'bijouterie',name:'Braquage de bijouterie',min:4,max:15, xp:6000,  dur:30, lvl:12, hue:285, art:'gem'},
-  {id:'roxwood',  name:'Banque de Roxwood',     min:4, max:10, xp:7500,  dur:30, lvl:14, hue:12,  art:'bank'},
-  {id:'paleto',   name:'Paleto Banque',         min:5, max:15, xp:11000, dur:45, lvl:18, hue:38,  art:'bank'},
-  {id:'train',    name:'Braquage de train',     min:3, max:8,  xp:13750, dur:30, lvl:22, hue:22,  art:'train'},
-  {id:'yacht',    name:'Yacht',                 min:5, max:15, xp:17500, dur:45, lvl:26, hue:200, art:'ship'},
-  {id:'pacific',  name:'Pacific Standard',      min:3, max:10, xp:20000, dur:45, lvl:32, hue:45,  art:'vault'},
-  {id:'humane',   name:'Humane Labs',           min:5, max:10, xp:22500, dur:30, lvl:36, hue:172, art:'flask'},
-  {id:'plateforme',name:'Plateforme pétrolière',min:7, max:23, xp:24000, dur:45, lvl:40, hue:192, art:'oil'},
-  {id:'bunker',   name:'Petit bunker',          min:7, max:23, xp:27500, dur:45, lvl:45, hue:90,  art:'bunker'}
+  {id:'gruppe6',  name:'Gruppe6',               min:2, max:7,  xp:2500,  dur:30, lvl:1,  cd:24, hue:140, art:'truck'},
+  {id:'bateau',   name:'Bateau de trafiquant',  min:4, max:7,  xp:1500,  dur:30, lvl:3,  cd:48, hue:205, art:'ship'},
+  {id:'conteneur',name:'Mission conteneur',     min:3, max:8,  xp:4000,  dur:30, lvl:4,  cd:0.75, hue:230, art:'container', open:true},
+  {id:'flecca',   name:'Flecca Banque',         min:4, max:10, xp:3500,  dur:30, lvl:5,  cd:48, hue:150, art:'bank'},
+  {id:'pine',     name:'Pine Banque',           min:4, max:15, xp:5000,  dur:30, lvl:7,  cd:48, hue:28,  art:'bank'},
+  {id:'bijouterie',name:'Braquage de bijouterie',min:4,max:15, xp:6000,  dur:30, lvl:12, cd:72, hue:285, art:'gem'},
+  {id:'roxwood',  name:'Banque de Roxwood',     min:4, max:10, xp:7500,  dur:30, lvl:14, cd:72, hue:12,  art:'bank'},
+  {id:'paleto',   name:'Paleto Banque',         min:5, max:15, xp:11000, dur:45, lvl:18, cd:72, hue:38,  art:'bank'},
+  {id:'train',    name:'Braquage de train',     min:3, max:8,  xp:13750, dur:30, lvl:22, cd:96, hue:22,  art:'train'},
+  {id:'yacht',    name:'Yacht',                 min:5, max:15, xp:17500, dur:45, lvl:26, cd:120, hue:200, art:'ship'},
+  {id:'pacific',  name:'Pacific Standard',      min:3, max:10, xp:20000, dur:45, lvl:32, cd:168, hue:45,  art:'vault'},
+  {id:'humane',   name:'Humane Labs',           min:5, max:10, xp:22500, dur:30, lvl:36, cd:168, hue:172, art:'flask'},
+  {id:'plateforme',name:'Plateforme pétrolière',min:7, max:23, xp:24000, dur:45, lvl:40, cd:168, hue:192, art:'oil'},
+  {id:'bunker',   name:'Petit bunker',          min:7, max:23, xp:27500, dur:45, lvl:45, cd:168, hue:90,  art:'bunker'}
 ];
 const MBY = Object.fromEntries(MISSIONS.map(m => [m.id, m]));
 // Peut lancer / reprendre cette OP : Exécutants et plus, ou tout membre pour une mission ouverte.
@@ -968,17 +969,31 @@ document.addEventListener('focusout', () => setTimeout(() => { if (S.pending && 
 
 /* ---------- Missions ---------- */
 function lastOpOf(mid){ return S.ops.filter(o => o.missionId === mid).sort((a,b) => (b.endedAt||0)-(a.endedAt||0))[0]; }
+// Dernier lancement d'une mission (bilans enregistrés et OP en cours). Une OP annulée ne compte pas.
+function lastLaunchOf(mid){
+  const ts = S.ops.filter(o => o.missionId === mid).map(o => o.startedAt || o.endedAt || 0)
+    .concat(S.live.filter(l => l.missionId === mid).map(l => l.startedAt || 0));
+  return ts.length ? Math.max(...ts) : 0;
+}
+// Temps restant avant de pouvoir relancer (ms), 0 si disponible.
+function cdLeft(m){ if (!m || !m.cd) return 0; const t = lastLaunchOf(m.id); return t ? Math.max(0, t + m.cd * 3600e3 - Date.now()) : 0; }
+const cdTxt = h => h < 1 ? `${Math.round(h * 60)} min` : `${h}h`;
+const leftTxt = ms => { const min = Math.ceil(ms / 60000); return min < 60 ? `${min} min` : min < 48 * 60 ? `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, '0')}` : `${Math.ceil(min / 60)} h`; };
 function missionCard(m){
   const locked = m.lvl > (Number(cfg().crewLevel)||1);
   let sub = m.lab ? 'Récolte pour le labo' : m.crew ? 'Opération du crew' : m.open ? 'Tout le monde peut la lancer' : 'Disponible en permanence', subCls = '';
+  const left = locked ? 0 : cdLeft(m); const running = S.live.some(l => l.missionId === m.id);
   if (locked) sub = `Débloquée au niveau ${m.lvl}`;
+  else if (running) { sub = 'OP en cours'; subCls = 'cool'; }
+  else if (left > 0) { sub = `En recharge · encore ${leftTxt(left)}`; subCls = 'cool'; }
   let btn;
   if (m.lab) btn = me() ? `<button class="btn pri" data-a="lnew" data-k="recolte" data-src="hotspot">Commencer</button>` : `<button class="btn lock-b" disabled>Connexion requise</button>`;
   else if (locked) btn = `<button class="btn lock-b" disabled>Niveau ${m.lvl} requis</button>`;
+  else if (left > 0) btn = `<button class="btn lock-b" disabled title="Relance possible ${cdTxt(m.cd)} après le lancement">${running ? 'OP en cours' : 'En recharge'}</button>`;
   else if (!canRun(m.id)) btn = `<button class="btn lock-b" disabled title="Seuls les Exécutants et plus lancent une OP">Réservé aux Exécutants</button>`;
   else btn = `<button class="btn pri" data-a="start" data-m="${m.id}">Commencer</button>`;
   return `<article class="mcard ${locked?'locked':''}" style="--h:${m.hue}">
-    <div class="mart"><span class="ghost-t">${esc(m.name)}</span>${art(m.art)}${m.lab || m.crew || m.open ? `<span class="cd">${m.lab ? 'Labo' : m.crew ? 'Crew' : 'Ouverte à tous'}</span>` : ''}</div>
+    <div class="mart"><span class="ghost-t">${esc(m.name)}</span>${art(m.art)}${m.cd ? `<span class="cd">${ic('clock')}${cdTxt(m.cd)}</span>` : m.lab || m.crew ? `<span class="cd">${m.lab ? 'Labo' : 'Crew'}</span>` : ''}</div>
     <div class="mbody">
       <div class="mname"><h3 title="${esc(m.name)}">${esc(m.name)}</h3><p class="${subCls}">${sub}</p></div>
       <div class="mstats">
@@ -2843,7 +2858,7 @@ const A = {
   unadmin(t){ const m = S.mdocs.find(x => x.id === t.dataset.id); S.confirm = null; if (!isAdmin() || !m || m.id === S.meId || (isFounder(m) && S.meId !== founderId())) { render(); return; }
     writeMember(m.id, {admin:false}).then(ok => { if (ok) toast(`${m.name} n'est plus admin.`); }); },
   noconfirm(){ S.confirm = null; S.wiz ? renderWiz() : render(); },
-  start(t){ if (!canRun(t.dataset.m)) return; S.wiz = newWiz(t.dataset.m); S.sel = null; S.confirm = null; Store.write('live/' + S.wiz.id, S.wiz); renderWiz(); },
+  start(t){ if (!canRun(t.dataset.m)) return; const cm = MBY[t.dataset.m]; if (cdLeft(cm) > 0) { toast(`${cm.name} : relance possible dans ${leftTxt(cdLeft(cm))}.`); render(); return; } S.wiz = newWiz(t.dataset.m); S.sel = null; S.confirm = null; Store.write('live/' + S.wiz.id, S.wiz); renderWiz(); },
   resume(t){ const l = S.live.find(x => x.id === t.dataset.id); if (!l || !canRun(l.missionId)) return; S.wiz = JSON.parse(JSON.stringify(l)); S.wiz.vehicles = S.wiz.vehicles || []; S.wiz.postes = S.wiz.postes || {}; S.wiz.participants = S.wiz.participants || []; S.sel = null; S.confirm = null; renderWiz(); },
   wclose(){ clearTimeout(wizSaveT); if (S.wiz) Store.write('live/' + S.wiz.id, Object.assign({}, S.wiz, {updatedAt:Date.now()})); S.wiz = null; S.sel = null; S.confirm = null; renderWiz(); render(); toast("L'OP reste en cours : reprends-la depuis Missions."); },
   wstep(t){ const w = S.wiz; const to = Number(t.dataset.to); if (to > 0 && !w.participants.length) return; w.step = to; S.sel = null; S.confirm = null; if (to === 2) ensureVehicles(w); wizChanged(); $('#modal .ov') && ($('#modal .ov').scrollTop = 0); },
